@@ -28,17 +28,17 @@ export default function LoginPage() {
 
     if (isLogin) {
       // ВХОД
-      const { data, error } = await signIn(email, password)
-      if (error) {
-        setError('Ошибка входа: ' + error.message)
+      const { error: signInError } = await signIn(email, password)
+      if (signInError) {
+        setError('Ошибка входа: ' + signInError.message)
       } else {
         navigate('/')
       }
     } else {
       // РЕГИСТРАЦИЯ
-      const { data, error } = await signUp(email, password)
-      if (error) {
-        setError('Ошибка регистрации: ' + error.message)
+      const { error: signUpError } = await signUp(email, password)
+      if (signUpError) {
+        setError('Ошибка регистрации: ' + signUpError.message)
       } else {
         alert('✅ Регистрация успешна! Теперь войдите.')
         setIsLogin(true)
