@@ -22,8 +22,8 @@ export default function AddCatchPage() {
         setLatitude(lat.toFixed(6))
         setLongitude(lng.toFixed(6))
         localStorage.removeItem('selectedLocation')
-      } catch (e) {
-        console.error("Ошибка чтения координат", e)
+      } catch (_e) {
+        console.error("Ошибка чтения координат")
       }
     }
   }, [])
@@ -38,7 +38,7 @@ export default function AddCatchPage() {
         setLatitude(position.coords.latitude.toFixed(6))
         setLongitude(position.coords.longitude.toFixed(6))
       },
-      (error) => {
+      (_error) => {
         setGeoError('Не удалось определить местоположение.')
       }
     )

@@ -28,8 +28,8 @@ function GeolocateButton({ onLocate }: { onLocate: (lat: number, lng: number) =>
         map.flyTo([latitude, longitude], 15, { duration: 1.5 })
         setLocating(false)
       },
-      (err) => {
-        alert('Не удалось определить местоположение: ' + err.message)
+      (_err) => {
+        alert('Не удалось определить местоположение.')
         setLocating(false)
       },
       { enableHighAccuracy: true, timeout: 10000 }
@@ -69,16 +69,12 @@ export default function LocationPicker() {
   const navigate = useNavigate()
   const [lat, setLat] = useState<number>(55.75)
   const [lng, setLng] = useState<number>(37.61)
-  const [userPos, setUserPos] = useState<[number, number] | null>(null)
 
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((pos) => {
-        const userLat = pos.coords.latitude
-        const userLng = pos.coords.longitude
-        setLat(userLat)
-        setLng(userLng)
-        setUserPos([userLat, userLng])
+        setLat(pos.coords.latitude)
+        setLng(pos.coords.longitude)
       }, () => {})
     }
   }, [])
@@ -110,7 +106,7 @@ export default function LocationPicker() {
           <LocationMarker setLatLng={(l, g) => { setLat(l); setLng(g); }} />
           
           <div className="absolute bottom-4 right-4 z-[1000]">
-            <GeolocateButton onLocate={(lat, lng) => { setLat(lat); setLng(lng); setUserPos([lat, lng]); }} />
+            <GeolocateButton onLocate={(lat, lng) => { setLat(lat); setLng(lng); }} />
           </div>
         </MapContainer>
       </div>
