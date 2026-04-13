@@ -5,6 +5,8 @@ import WeatherPage from './pages/WeatherPage'
 import AIPage from './pages/AIPage'
 import AddCatchPage from './pages/AddCatchPage'
 import LocationPicker from './pages/LocationPicker'
+import LoginPage from './pages/LoginPage'
+import AuthStatus from './components/AuthStatus'
 
 function NavButton({ to, icon, label }: { to: string; icon: string; label: string }) {
   const location = useLocation()
@@ -20,7 +22,10 @@ function NavButton({ to, icon, label }: { to: string; icon: string; label: strin
 function App() {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-      <header className="p-4 bg-white shadow text-center font-bold text-lg">🎣 FishCatch PWA</header>
+      <header className="p-4 bg-white shadow flex justify-between items-center">
+        <h1 className="font-bold text-lg">🎣 FishCatch PWA</h1>
+        <AuthStatus />
+      </header>
       
       <main className="flex-1 overflow-y-auto">
         <Routes>
@@ -31,6 +36,7 @@ function App() {
           <Route path="/ai" element={<AIPage />} />
           <Route path="/add-catch" element={<AddCatchPage />} />
           <Route path="/select-location" element={<LocationPicker />} />
+          <Route path="/login" element={<LoginPage />} />
         </Routes>
       </main>
 
