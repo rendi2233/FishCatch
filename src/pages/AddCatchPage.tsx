@@ -10,12 +10,10 @@ export default function AddCatchPage() {
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   
-  // Состояния для координат
   const [latitude, setLatitude] = useState<string>('')
   const [longitude, setLongitude] = useState<string>('')
   const [geoError, setGeoError] = useState('')
 
-  // Слушаем возврат с карты выбора места
   useEffect(() => {
     const savedLoc = localStorage.getItem('selectedLocation')
     if (savedLoc) {
@@ -23,14 +21,13 @@ export default function AddCatchPage() {
         const { lat, lng } = JSON.parse(savedLoc)
         setLatitude(lat.toFixed(6))
         setLongitude(lng.toFixed(6))
-        localStorage.removeItem('selectedLocation') // Очищаем память
+        localStorage.removeItem('selectedLocation')
       } catch (e) {
         console.error("Ошибка чтения координат", e)
       }
     }
   }, [])
 
-  // Функция для кнопки GPS (если всё же нужно определить автоматически)
   const handleGetGPS = () => {
     if (!navigator.geolocation) {
       setGeoError('Браузер не поддерживает геолокацию')
@@ -56,7 +53,7 @@ export default function AddCatchPage() {
 
     setLoading(true)
 
-    const { error } = await supabase
+    const { error: supabaseError } = await supabase
       .from('catches')
       .insert([
         {
@@ -72,11 +69,11 @@ export default function AddCatchPage() {
         }
       ])
 
-    if (error) {
-      alert('Ошибка: ' + error.message)
+    if (supabaseError) {
+      console.error('Supabase error:', supabaseError)
+      alert('Ошибка: ' + supabaseError.message)
     } else {
       alert('Улов добавлен! 🎉')
-      // Сброс формы
       setFishType('')
       setFishCount('1')
       setWeight('')
@@ -95,11 +92,9 @@ export default function AddCatchPage() {
       <h2 className="text-2xl font-bold mb-4 text-center">Добавить улов</h2>
       
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Блок координат */}
         <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 space-y-2">
           <label className="block text-sm font-semibold text-blue-800">📍 Место ловли</label>
           
-          {/* Кнопка перехода на карту */}
           <button
             type="button"
             onClick={() => window.location.href = '/select-location'}
@@ -123,7 +118,7 @@ export default function AddCatchPage() {
               step="any"
               placeholder="Широта (Lat)"
               value={latitude}
-              readOnly // Только для чтения, чтобы случайно не стереть
+              readOnly
               className="w-full p-2 border rounded text-sm bg-white text-gray-600"
             />
             <input
@@ -137,7 +132,6 @@ export default function AddCatchPage() {
           </div>
         </div>
 
-        {/* Остальные поля формы */}
         <div>
           <label className="block text-sm font-medium mb-1">Тип рыбы</label>
           <input type="text" value={fishType} onChange={(e) => setFishType(e.target.value)} className="w-full p-2 border rounded-lg" placeholder="Например: Щука, Окунь..." required />

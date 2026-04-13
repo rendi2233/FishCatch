@@ -11,7 +11,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: new URL('leaflet/dist/images/marker-shadow.png', import.meta.url).href,
 })
 
-// Компонент для кнопки GPS
 function GeolocateButton({ onLocate }: { onLocate: (lat: number, lng: number) => void }) {
   const map = useMap()
   const [locating, setLocating] = useState(false)
@@ -49,7 +48,7 @@ function GeolocateButton({ onLocate }: { onLocate: (lat: number, lng: number) =>
   )
 }
 
-function LocationMarker({ setLatLng, userPosition }: { setLatLng: (lat: number, lng: number) => void, userPosition: [number, number] | null }) {
+function LocationMarker({ setLatLng }: { setLatLng: (lat: number, lng: number) => void }) {
   const [position, setPosition] = useState<L.LatLng | null>(null)
 
   useMapEvents({
@@ -108,9 +107,8 @@ export default function LocationPicker() {
             attribution='&copy; OpenStreetMap'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          <LocationMarker setLatLng={(l, g) => { setLat(l); setLng(g); }} userPosition={userPos} />
+          <LocationMarker setLatLng={(l, g) => { setLat(l); setLng(g); }} />
           
-          {/* Кнопка GPS в правом нижнем углу карты */}
           <div className="absolute bottom-4 right-4 z-[1000]">
             <GeolocateButton onLocate={(lat, lng) => { setLat(lat); setLng(lng); setUserPos([lat, lng]); }} />
           </div>
