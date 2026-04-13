@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import { supabase } from '../lib/supabase'
 import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
 
-// Исправляем иконки маркеров (стандартный фикс для React)
+// Фикс иконок Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl
 L.Icon.Default.mergeOptions({
   iconUrl: new URL('leaflet/dist/images/marker-icon.png', import.meta.url).href,
@@ -13,66 +12,102 @@ L.Icon.Default.mergeOptions({
 })
 
 type Catch = {
-  id: string
+  id: number
   fish_type: string
   weight: number
   catch_date: string
-  location_lat: number
-  location_lng: number
+  location_lat: number | null
+  location_lng: number | null
 }
 
 export default function MapPage() {
   const [catches, setCatches] = useState<Catch[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedLocation, setSelectedLocation] = useState<[number, number] | null>(null)
 
   useEffect(() => {
+    // 🔥 Проверяем, есть ли координаты для отображения (из дневника)
+    const savedLocation = localStorage.getItem('viewLocation')
+    if (savedLocation) {
+      try {
+        const { lat, lng } = JSON.parse(savedLocation)
+        setSelectedLocation([lat, lng])
+        // Очищаем после использования
+        localStorage.removeItem('viewLocation')
+      } catch (_e) {
+        console.error('Ошибка чтения координат')
+      }
+    }
+
     loadCatches()
   }, [])
 
   const loadCatches = async () => {
-    // Берем только те записи, у которых есть координаты
-    const { data, error } = await supabase
-      .from('catches')
-      .select('id, fish_type, weight, catch_date, location_lat, location_lng')
-      .not('location_lat', 'is', null) 
-      .order('catch_date', { ascending: false })
+    try {
+      const { data, error } = await supabase
+        .from('catches')
+        .select('*')
+        .not('location_lat', 'is', null)
+        .not('location_lng', 'is', null)
 
-    if (error) console.error('Ошибка загрузки карты:', error)
-    else setCatches(data || [])
-
-    setLoading(false)
+      if (error) throw error
+      setCatches(data || [])
+    } catch (error: any) {
+      console.error('Ошибка загрузки:', error.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
+  if (loading) return <div className="p-4 text-center">⏳ Загружаем карту...</div>
+
+  // 🔥 Показываем выбранную точку или центр карты
+  const defaultCenter: [number, number] = selectedLocation || [55.75, 37.61]
+  const defaultZoom = selectedLocation ? 15 : 10
+
   return (
-    <div className="h-full w-full relative z-0">
-      <MapContainer center={[55.75, 37.61]} zoom={10} className="h-full w-full">
+    <div className="h-[calc(100vh-140px)]">
+      <MapContainer 
+        center={defaultCenter} 
+        zoom={defaultZoom} 
+        className="h-full w-full"
+      >
         <TileLayer
-          attribution='&copy; OpenStreetMap contributors'
+          attribution='&copy; OpenStreetMap'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
-        {/* Рисуем маркеры */}
-        {catches.map((c) => (
-          <Marker key={c.id} position={[c.location_lat, c.location_lng]}>
+        {/* 🔥 Маркер выбранной точки из дневника */}
+        {selectedLocation && (
+          <Marker position={selectedLocation}>
             <Popup>
-              <div className="text-center">
-                <strong className="text-lg block">{c.fish_type}</strong>
-                <span>Вес: {c.weight} кг</span><br/>
-                <small className="text-gray-500">
-                  {new Date(c.catch_date).toLocaleDateString()}
-                </small>
-              </div>
+              <strong>📍 Место улова</strong><br/>
+              Выбрано из дневника
             </Popup>
           </Marker>
-        ))}
+        )}
+
+        {/* 🔥 Все уловы */}
+        {catches.map((c) => {
+          // 🔥 Пропускаем уловы без координат (защита от null/undefined)
+          if (c.location_lat == null || c.location_lng == null) {
+            return null
+          }
+          
+          return (
+            <Marker 
+              key={c.id} 
+              position={[c.location_lat, c.location_lng]}
+            >
+              <Popup>
+                <strong>{c.fish_type}</strong><br/>
+                📅 {new Date(c.catch_date).toLocaleDateString('ru-RU')}<br/>
+                ⚖️ {c.weight} кг
+              </Popup>
+            </Marker>
+          )
+        })}
       </MapContainer>
-      
-      {/* Индикатор загрузки поверх карты */}
-      {loading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80 z-[1000] text-blue-600 font-bold">
-          ⏳ Загружаем точки...
-        </div>
-      )}
     </div>
   )
 }

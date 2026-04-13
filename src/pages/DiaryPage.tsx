@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser } from '../lib/auth'
+import { useNavigate } from 'react-router-dom'
 
 type Catch = {
   id: number
@@ -12,17 +13,43 @@ type Catch = {
   notes: string | null
   catch_date: string
   user_id: string
+  time_of_day?: string[] | null
+  location_lat?: number | null
+  location_lng?: number | null
+}
+
+const getTimeIcon = (time: string) => {
+  switch(time) {
+    case 'night': return '🌙'
+    case 'morning': return '🌅'
+    case 'day': return '☀️'
+    case 'evening': return '🌇'
+    default: return '🕐'
+  }
+}
+
+const getTimeLabel = (time: string) => {
+  switch(time) {
+    case 'night': return 'Ночь'
+    case 'morning': return 'Утро'
+    case 'day': return 'День'
+    case 'evening': return 'Вечер'
+    default: return time
+  }
 }
 
 export default function DiaryPage() {
   const [catches, setCatches] = useState<Catch[]>([])
   const [loading, setLoading] = useState(true)
   const [currentUser, setCurrentUser] = useState<any>(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
-    // Получаем текущего пользователя
-    const user = getCurrentUser()
-    setCurrentUser(user)
+    const checkAuth = async () => {
+      const user = await getCurrentUser()
+      setCurrentUser(user)
+    }
+    checkAuth()
     loadCatches()
   }, [])
 
@@ -31,17 +58,15 @@ export default function DiaryPage() {
       const user = await getCurrentUser()
       
       if (!user) {
-        // Если пользователь не вошёл, показываем пустой список
         setCatches([])
         setLoading(false)
         return
       }
 
-      // Загружаем ТОЛЬКО свои уловы
       const { data, error } = await supabase
         .from('catches')
         .select('*')
-        .eq('user_id', user.id)  // 🔥 ФИЛЬТР ПО user_id
+        .eq('user_id', user.id)
         .order('catch_date', { ascending: false })
 
       if (error) throw error
@@ -51,6 +76,37 @@ export default function DiaryPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleDelete = async (id: number, fishType: string) => {
+    const confirmed = confirm(`🗑️ Удалить запись "${fishType}"?`)
+    if (!confirmed) return
+
+    try {
+      const { error } = await supabase
+        .from('catches')
+        .delete()
+        .eq('id', id)
+
+      if (error) {
+        alert('Ошибка при удалении: ' + error.message)
+      } else {
+        setCatches(prev => prev.filter(c => c.id !== id))
+        alert('✅ Улов удалён!')
+      }
+    } catch (error: any) {
+      alert('Ошибка: ' + error.message)
+    }
+  }
+
+  const handleViewOnMap = (lat: number | null | undefined, lng: number | null | undefined) => {
+    if (lat == null || lng == null) {
+      alert('📍 Координаты не указаны для этого улова')
+      return
+    }
+    
+    localStorage.setItem('viewLocation', JSON.stringify({ lat, lng }))
+    navigate('/map')
   }
 
   if (loading) return <div className="p-4 text-center">⏳ Загружаем дневник...</div>
@@ -81,12 +137,16 @@ export default function DiaryPage() {
         </div>
       ) : (
         catches.map((c) => (
-          <div key={c.id} className="bg-white p-4 rounded-xl shadow border-l-4 border-blue-500">
+          <div 
+            key={c.id} 
+            className="bg-white p-4 rounded-xl shadow border-l-4 border-blue-500 hover:shadow-lg transition cursor-pointer"
+            onClick={() => handleViewOnMap(c.location_lat, c.location_lng)}
+          >
             <div className="flex justify-between items-start">
-              <div>
+              <div className="flex-1">
                 <h3 className="font-bold text-lg">{c.fish_type}</h3>
                 <p className="text-xs text-gray-400">
-                  {new Date(c.catch_date).toLocaleDateString()}
+                  📅 {new Date(c.catch_date).toLocaleDateString('ru-RU')}
                 </p>
               </div>
               <div className="text-right">
@@ -100,11 +160,51 @@ export default function DiaryPage() {
               <span>⏱️ Время: {c.duration_hours || '-'} ч.</span>
             </div>
 
+            {c.time_of_day && c.time_of_day.length > 0 && (
+              <div className="mt-2 flex gap-2 flex-wrap">
+                {c.time_of_day.map((time: string) => (
+                  <span
+                    key={time}
+                    className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full flex items-center gap-1"
+                  >
+                    {getTimeIcon(time)} {getTimeLabel(time)}
+                  </span>
+                ))}
+              </div>
+            )}
+
             {c.notes && (
               <p className="mt-2 text-sm text-gray-700 bg-gray-50 p-2 rounded">
                 💬 {c.notes}
               </p>
             )}
+
+            <div className="mt-3 flex gap-2 pt-3 border-t">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleViewOnMap(c.location_lat, c.location_lng)
+                }}
+                className="flex-1 bg-green-50 text-green-700 py-2 rounded-lg text-sm font-semibold hover:bg-green-100 flex items-center justify-center gap-1"
+              >
+                🗺️ На карте
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleDelete(c.id, c.fish_type)
+                }}
+                className="flex-1 bg-red-50 text-red-700 py-2 rounded-lg text-sm font-semibold hover:bg-red-100 flex items-center justify-center gap-1"
+              >
+                🗑️ Удалить
+              </button>
+            </div>
+
+            {c.location_lat == null || c.location_lng == null ? (
+              <p className="mt-2 text-xs text-orange-600 bg-orange-50 p-2 rounded">
+                ⚠️ Координаты не указаны
+              </p>
+            ) : null}
           </div>
         ))
       )}
