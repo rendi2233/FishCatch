@@ -3,6 +3,25 @@ import { supabase } from '../lib/supabase'
 import { getCurrentUser } from '../lib/auth'
 import { useNavigate } from 'react-router-dom'
 
+// 🔥 Ключ для sessionStorage
+const FORM_STORAGE_KEY = 'fishcatch_add_form'
+
+// 🔥 Тип для состояния формы
+type FormState = {
+  fishType: string
+  fishCount: string
+  weight: string
+  biteRating: string
+  duration: string
+  notes: string
+  catchDate: string
+  timeOfDay: string[]
+  lureType: string
+  lureColor: string
+  latitude: string
+  longitude: string
+}
+
 export default function AddCatchPage() {
   const [fishType, setFishType] = useState('')
   const [fishCount, setFishCount] = useState('1')
@@ -24,6 +43,53 @@ export default function AddCatchPage() {
 
   const navigate = useNavigate()
 
+  // 🔥 ВОССТАНОВЛЕНИЕ ФОРМЫ при монтировании
+  useEffect(() => {
+    const saved = sessionStorage.getItem(FORM_STORAGE_KEY)
+    if (saved) {
+      try {
+        const form: FormState = JSON.parse(saved)
+        setFishType(form.fishType || '')
+        setFishCount(form.fishCount || '1')
+        setWeight(form.weight || '')
+        setBiteRating(form.biteRating || '')
+        setDuration(form.duration || '')
+        setNotes(form.notes || '')
+        setCatchDate(form.catchDate || new Date().toISOString().split('T')[0])
+        setTimeOfDay(form.timeOfDay || [])
+        setLureType(form.lureType || '')
+        setLureColor(form.lureColor || '')
+        // Координаты не восстанавливаем — они могут быть старыми
+      } catch (_e) {
+        console.error('Ошибка восстановления формы')
+      }
+    }
+  }, [])
+
+  // 🔥 СОХРАНЕНИЕ ФОРМЫ перед навигацией на карту
+  const saveFormState = () => {
+    const form: FormState = {
+      fishType,
+      fishCount,
+      weight,
+      biteRating,
+      duration,
+      notes,
+      catchDate,
+      timeOfDay,
+      lureType,
+      lureColor,
+      latitude,
+      longitude,
+    }
+    sessionStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(form))
+  }
+
+  // 🔥 ОЧИСТКА формы после успешного сохранения
+  const clearFormState = () => {
+    sessionStorage.removeItem(FORM_STORAGE_KEY)
+  }
+
   useEffect(() => {
     const checkAuth = async () => {
       const user = await getCurrentUser()
@@ -36,6 +102,7 @@ export default function AddCatchPage() {
   }, [navigate])
 
   useEffect(() => {
+    // Читаем координаты из localStorage (после выбора на карте)
     const savedLoc = localStorage.getItem('selectedLocation')
     if (savedLoc) {
       try {
@@ -84,6 +151,12 @@ export default function AddCatchPage() {
     setLureColor('')
   }
 
+  // 🔥 Переход на карту с сохранением формы
+  const handleSelectLocation = () => {
+    saveFormState()  // 🔥 Сохраняем перед уходом
+    window.location.href = '/select-location'
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -104,12 +177,9 @@ export default function AddCatchPage() {
     const fullDate = new Date(catchDate)
     fullDate.setHours(12, 0, 0, 0)
 
-    // 🔥 Конвертируем массив в формат PostgreSQL: {morning,evening}
     const timeOfDayValue = timeOfDay.length > 0 
       ? `{${timeOfDay.join(',')}}` 
       : null
-
-    console.log('📤 Отправляем:', { timeOfDay, timeOfDayValue })
 
     const { error: supabaseError } = await supabase
       .from('catches')
@@ -137,6 +207,7 @@ export default function AddCatchPage() {
     } else {
       console.log('✅ Успешно сохранено!')
       alert('Улов добавлен! 🎉')
+      clearFormState()  // 🔥 Очищаем после успеха
       setFishType('')
       setFishCount('1')
       setWeight('')
@@ -224,7 +295,7 @@ export default function AddCatchPage() {
             <div className="space-y-2">
               <button
                 type="button"
-                onClick={() => window.location.href = '/select-location'}
+                onClick={handleSelectLocation}  // 🔥 Теперь с сохранением формы
                 className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
               >
                 🗺️ Выбрать на карте
