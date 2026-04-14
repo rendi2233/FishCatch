@@ -3,10 +3,8 @@ import { supabase } from '../lib/supabase'
 import { getCurrentUser } from '../lib/auth'
 import { useNavigate } from 'react-router-dom'
 
-// 🔥 Ключ для sessionStorage
 const FORM_STORAGE_KEY = 'fishcatch_add_form'
 
-// 🔥 Тип для состояния формы
 type FormState = {
   fishType: string
   fishCount: string
@@ -43,7 +41,6 @@ export default function AddCatchPage() {
 
   const navigate = useNavigate()
 
-  // 🔥 ВОССТАНОВЛЕНИЕ ФОРМЫ при монтировании
   useEffect(() => {
     const saved = sessionStorage.getItem(FORM_STORAGE_KEY)
     if (saved) {
@@ -59,33 +56,21 @@ export default function AddCatchPage() {
         setTimeOfDay(form.timeOfDay || [])
         setLureType(form.lureType || '')
         setLureColor(form.lureColor || '')
-        // Координаты не восстанавливаем — они могут быть старыми
       } catch (_e) {
         console.error('Ошибка восстановления формы')
       }
     }
   }, [])
 
-  // 🔥 СОХРАНЕНИЕ ФОРМЫ перед навигацией на карту
   const saveFormState = () => {
     const form: FormState = {
-      fishType,
-      fishCount,
-      weight,
-      biteRating,
-      duration,
-      notes,
-      catchDate,
-      timeOfDay,
-      lureType,
-      lureColor,
-      latitude,
-      longitude,
+      fishType, fishCount, weight, biteRating, duration, notes,
+      catchDate, timeOfDay, lureType, lureColor,
+      latitude, longitude,
     }
     sessionStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(form))
   }
 
-  // 🔥 ОЧИСТКА формы после успешного сохранения
   const clearFormState = () => {
     sessionStorage.removeItem(FORM_STORAGE_KEY)
   }
@@ -102,7 +87,6 @@ export default function AddCatchPage() {
   }, [navigate])
 
   useEffect(() => {
-    // Читаем координаты из localStorage (после выбора на карте)
     const savedLoc = localStorage.getItem('selectedLocation')
     if (savedLoc) {
       try {
@@ -134,9 +118,7 @@ export default function AddCatchPage() {
 
   const toggleTimeOfDay = (time: string) => {
     setTimeOfDay(prev => 
-      prev.includes(time) 
-        ? prev.filter(t => t !== time)
-        : [...prev, time]
+      prev.includes(time) ? prev.filter(t => t !== time) : [...prev, time]
     )
   }
 
@@ -151,9 +133,8 @@ export default function AddCatchPage() {
     setLureColor('')
   }
 
-  // 🔥 Переход на карту с сохранением формы
   const handleSelectLocation = () => {
-    saveFormState()  // 🔥 Сохраняем перед уходом
+    saveFormState()
     window.location.href = '/select-location'
   }
 
@@ -173,33 +154,29 @@ export default function AddCatchPage() {
     }
 
     setLoading(true)
-
     const fullDate = new Date(catchDate)
     fullDate.setHours(12, 0, 0, 0)
 
-    const timeOfDayValue = timeOfDay.length > 0 
-      ? `{${timeOfDay.join(',')}}` 
-      : null
+    const timeOfDayValue = timeOfDay.length > 0 ? `{${timeOfDay.join(',')}}` : null
 
     const { error: supabaseError } = await supabase
       .from('catches')
-      .insert([
-        {
-          fish_type: fishType,
-          fish_count: parseInt(fishCount) || 1,
-          weight: parseFloat(weight) || 0,
-          bite_rating: parseInt(biteRating) || null,
-          duration_hours: parseFloat(duration) || null,
-          notes: notes || null,
-          catch_date: fullDate.toISOString(),
-          location_lat: parseFloat(latitude),
-          location_lng: parseFloat(longitude),
-          user_id: user.id,
-          time_of_day: timeOfDayValue,
-          lure_type: lureType || null,
-          lure_color: lureColor || null,
-        }
-      ])
+      .insert([{
+        fish_type: fishType,
+        fish_count: parseInt(fishCount) || 1,
+        weight: parseFloat(weight) || 0,
+        bite_rating: parseInt(biteRating) || null,
+        duration_hours: parseFloat(duration) || null,
+        notes: notes || null,
+        catch_date: fullDate.toISOString(),
+        location_lat: parseFloat(latitude),
+        location_lng: parseFloat(longitude),
+        user_id: user.id,
+        time_of_day: timeOfDayValue,
+        lure_type: lureType || null,
+        lure_color: lureColor || null,
+        // nickname удалён
+      }])
 
     if (supabaseError) {
       console.error('Supabase error:', supabaseError)
@@ -207,7 +184,7 @@ export default function AddCatchPage() {
     } else {
       console.log('✅ Успешно сохранено!')
       alert('Улов добавлен! 🎉')
-      clearFormState()  // 🔥 Очищаем после успеха
+      clearFormState()
       setFishType('')
       setFishCount('1')
       setWeight('')
@@ -238,13 +215,7 @@ export default function AddCatchPage() {
         {/* Дата */}
         <div>
           <label className={labelClass}>📅 Дата рыбалки <span className="text-red-500">*</span></label>
-          <input
-            type="date"
-            value={catchDate}
-            onChange={(e) => setCatchDate(e.target.value)}
-            className={requiredInputClass}
-            required
-          />
+          <input type="date" value={catchDate} onChange={(e) => setCatchDate(e.target.value)} className={requiredInputClass} required />
         </div>
 
         {/* Время суток */}
@@ -257,76 +228,33 @@ export default function AddCatchPage() {
               { id: 'day', label: '☀️ День', value: 'day' },
               { id: 'evening', label: '🌇 Вечер', value: 'evening' },
             ].map((time) => (
-              <label
-                key={time.id}
-                className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition
-                  ${timeOfDay.includes(time.value) ? 'bg-blue-50 border-blue-500' : 'bg-white border-gray-200'}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={timeOfDay.includes(time.value)}
-                  onChange={() => toggleTimeOfDay(time.value)}
-                  className="w-4 h-4 text-blue-600 rounded"
-                />
+              <label key={time.id} className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition ${timeOfDay.includes(time.value) ? 'bg-blue-50 border-blue-500' : 'bg-white border-gray-200'}`}>
+                <input type="checkbox" checked={timeOfDay.includes(time.value)} onChange={() => toggleTimeOfDay(time.value)} className="w-4 h-4 text-blue-600 rounded" />
                 <span className="text-sm">{time.label}</span>
               </label>
             ))}
           </div>
         </div>
 
-        {/* Блок координат */}
+        {/* Координаты */}
         <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
           <label className="block text-sm font-semibold text-blue-800 mb-2">📍 Место ловли <span className="text-red-500">*</span></label>
-          
           {latitude && longitude ? (
             <div className="flex flex-col gap-2">
-              <div className="text-sm text-gray-700 bg-white p-2 rounded border">
-                ✅ Выбрано: {latitude}, {longitude}
-              </div>
-              <button
-                type="button"
-                onClick={resetLocation}
-                className="w-full bg-gray-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-gray-700"
-              >
-                🔄 Выбрать заново
-              </button>
+              <div className="text-sm text-gray-700 bg-white p-2 rounded border">✅ Выбрано: {latitude}, {longitude}</div>
+              <button type="button" onClick={resetLocation} className="w-full bg-gray-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-gray-700">🔄 Выбрать заново</button>
             </div>
           ) : (
             <div className="space-y-2">
-              <button
-                type="button"
-                onClick={handleSelectLocation}  // 🔥 Теперь с сохранением формы
-                className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
-              >
-                🗺️ Выбрать на карте
-              </button>
-              
+              <button type="button" onClick={handleSelectLocation} className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700">🗺️ Выбрать на карте</button>
               <div className="flex items-center gap-2 text-xs text-gray-500 justify-center">
                 <span>или</span>
-                <button type="button" onClick={handleGetGPS} className="text-blue-600 underline">
-                  определить GPS
-                </button>
+                <button type="button" onClick={handleGetGPS} className="text-blue-600 underline">определить GPS</button>
               </div>
-
               {geoError && <p className="text-xs text-red-600 text-center">{geoError}</p>}
-
               <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="number"
-                  step="any"
-                  placeholder="Широта"
-                  value={latitude}
-                  readOnly
-                  className="w-full p-2 border rounded text-sm bg-white text-gray-600"
-                />
-                <input
-                  type="number"
-                  step="any"
-                  placeholder="Долгота"
-                  value={longitude}
-                  readOnly
-                  className="w-full p-2 border rounded text-sm bg-white text-gray-600"
-                />
+                <input type="number" step="any" placeholder="Широта" value={latitude} readOnly className="w-full p-2 border rounded text-sm bg-white text-gray-600" />
+                <input type="number" step="any" placeholder="Долгота" value={longitude} readOnly className="w-full p-2 border rounded text-sm bg-white text-gray-600" />
               </div>
             </div>
           )}
@@ -352,9 +280,7 @@ export default function AddCatchPage() {
 
         {/* Клёв */}
         <div>
-          <label className={labelClass}>
-            Оценка клёва (1-10): <span className="text-blue-600 font-bold">{biteRating || '-'}</span>
-          </label>
+          <label className={labelClass}>Оценка клёва (1-10): <span className="text-blue-600 font-bold">{biteRating || '-'}</span></label>
           <input type="range" min="1" max="10" step="1" value={biteRating} onChange={(e) => setBiteRating(e.target.value)} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" />
           <div className="flex justify-between text-xs text-gray-500 mt-1"><span>1</span><span>5</span><span>10</span></div>
         </div>
@@ -368,7 +294,6 @@ export default function AddCatchPage() {
         {/* Приманки */}
         <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-3">
           <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">🎣 Детали приманки (необязательно)</p>
-          
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelClass}>Тип приманки</label>
@@ -383,14 +308,10 @@ export default function AddCatchPage() {
                 <option value="Другое">Другое</option>
               </select>
             </div>
-
             <div>
-              <label className={labelClass}>
-                {isFloat ? '🪱 Насадка' : '🎨 Цвет'}
-              </label>
+              <label className={labelClass}>{isFloat ? '🪱 Насадка' : '🎨 Цвет'}</label>
               <select value={lureColor} onChange={(e) => setLureColor(e.target.value)} className={requiredInputClass}>
                 <option value="">Не указано</option>
-                
                 {isFloat ? (
                   <>
                     <option value="Хлеб">Хлеб</option>
@@ -420,11 +341,7 @@ export default function AddCatchPage() {
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className={requiredInputClass} rows={3} placeholder="Где поймал, на что клевало..." />
         </div>
 
-        <button
-          type="submit"
-          disabled={loading || !latitude}
-          className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed sticky bottom-4 shadow-lg"
-        >
+        <button type="submit" disabled={loading || !latitude} className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed sticky bottom-4 shadow-lg">
           {loading ? 'Сохраняем...' : '💾 Сохранить улов'}
         </button>
       </form>
