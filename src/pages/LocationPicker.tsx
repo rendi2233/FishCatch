@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-lea
 import { useNavigate } from 'react-router-dom'
 import L from 'leaflet'
 
-// Фикс иконок
+// Фикс иконок Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl
 L.Icon.Default.mergeOptions({
   iconUrl: new URL('leaflet/dist/images/marker-icon.png', import.meta.url).href,
@@ -40,7 +40,7 @@ function GeolocateButton({ onLocate }: { onLocate: (lat: number, lng: number) =>
     <button
       onClick={handleLocate}
       disabled={locating}
-      className="bg-white text-blue-600 p-2 rounded-full shadow-lg hover:bg-gray-100 disabled:opacity-50 font-bold text-xl"
+      className="bg-white text-blue-600 p-3 rounded-full shadow-lg hover:bg-gray-100 disabled:opacity-50 font-bold text-xl z-[1000]"
       title="Моё местоположение"
     >
       {locating ? '📡' : '📍'}
@@ -85,7 +85,8 @@ export default function LocationPicker() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-100 overflow-hidden">
+    // 🔥 ИСПРАВЛЕНО: h-[100dvh] вместо h-screen для корректной работы на мобильных
+    <div className="flex flex-col h-[100dvh] bg-gray-100 overflow-hidden touch-manipulation">
       <header className="bg-white p-3 shadow flex justify-between items-center shrink-0 z-[1000]">
         <button onClick={() => navigate(-1)} className="text-gray-600 font-bold px-2">✕ Отмена</button>
         <span className="font-semibold text-gray-800 text-sm sm:text-base">Ткни в место ловли</span>
@@ -97,7 +98,8 @@ export default function LocationPicker() {
         </button>
       </header>
 
-      <div className="relative h-[60vh] w-full z-0">
+      {/* 🔥 ИСПРАВЛЕНО: flex-1 min-h-0 предотвращает выход за границы экрана */}
+      <div className="relative flex-1 min-h-0 w-full z-0">
         <MapContainer center={[lat, lng]} zoom={13} className="h-full w-full" zoomControl={true}>
           <TileLayer
             attribution='&copy; OpenStreetMap'
@@ -111,7 +113,7 @@ export default function LocationPicker() {
         </MapContainer>
       </div>
 
-      <div className="p-4 text-center text-xs text-gray-500 shrink-0 bg-white border-t">
+      <div className="p-3 text-center text-xs text-gray-500 shrink-0 bg-white border-t">
         Координаты: {lat.toFixed(4)}, {lng.toFixed(4)}
       </div>
     </div>
