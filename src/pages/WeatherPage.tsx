@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 type WeatherData = {
   temp: number
   feels_like: number
-  pressure: number // в hPa
+  pressure: number
   wind_speed: number
   description: string
   icon: string
@@ -15,31 +15,42 @@ export default function WeatherPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  // 🔥 Получаем ключ из .env (вместо хардкода!)
+  const API_KEY = import.meta.env.VITE_OPENWEATHER_API_KEY
+
   useEffect(() => {
+    if (!API_KEY) {
+      setError('⚠️ VITE_OPENWEATHER_API_KEY не найден в .env')
+      setLoading(false)
+      return
+    }
     fetchWeatherData()
-  }, [])
+  }, [API_KEY])
 
   const fetchWeatherData = async (lat?: number, lon?: number) => {
-    // ЗАМЕНИ ЭТУ СТРОКУ НА СВОЙ КЛЮЧ ОТ OPENWEATHERMAP
-    const API_KEY = '058655024e60c3f947d9e93ef69fe4c3'; 
-    
-    // Координаты по умолчанию (Москва), если геолокация недоступна
-    let targetLat = 55.75;
-    let targetLon = 37.61;
+    let targetLat = 55.75
+    let targetLon = 37.61
 
     if (lat && lon) {
-      targetLat = lat;
-      targetLon = lon;
+      targetLat = lat
+      targetLon = lon
     }
 
     try {
       const response = await fetch(
         `https://api.openweathermap.org/data/2.5/weather?lat=${targetLat}&lon=${targetLon}&appid=${API_KEY}&units=metric&lang=ru`
-      );
+      )
 
-      if (!response.ok) throw new Error('Ошибка API (проверь ключ или подожди активации)');
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Неверный API ключ')
+        } else if (response.status === 404) {
+          throw new Error('Город не найден')
+        }
+        throw new Error(`Ошибка API: ${response.status}`)
+      }
 
-      const data = await response.json();
+      const data = await response.json()
 
       setWeather({
         temp: Math.round(data.main.temp),
@@ -49,41 +60,44 @@ export default function WeatherPage() {
         description: data.weather[0].description,
         icon: data.weather[0].icon,
         city: data.name,
-      });
+      })
     } catch (err: any) {
-      setError(err.message || 'Не удалось загрузить погоду');
+      setError(err.message || 'Не удалось загрузить погоду')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
-  // Запрашиваем геопозицию при загрузке
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          fetchWeatherData(pos.coords.latitude, pos.coords.longitude);
+          fetchWeatherData(pos.coords.latitude, pos.coords.longitude)
         },
         () => {
-          // Если отказали в доступе, грузим погоду для Москвы (или дефолтных координат)
-          fetchWeatherData();
+          fetchWeatherData()
         }
-      );
+      )
     }
-  }, []);
+  }, [])
 
   if (loading) return <div className="p-10 text-center text-xl animate-pulse">⏳ Загружаем погоду...</div>
-  if (error) return <div className="p-10 text-center text-red-600">⚠️ {error}<br/><small>Проверь API ключ в коде</small></div>
-  if (!weather) return null;
+  if (error) return (
+    <div className="p-10 text-center text-red-600">
+      {error}
+      <br/>
+      <small className="text-xs text-gray-500">
+        Проверь .env файл и ключ VITE_OPENWEATHER_API_KEY
+      </small>
+    </div>
+  )
+  if (!weather) return null
 
-  // Перевод давления из hPa в мм рт. ст. (1 hPa ≈ 0.75 мм рт. ст.)
-  const pressureMmHg = Math.round(weather.pressure * 0.750062);
+  const pressureMmHg = Math.round(weather.pressure * 0.750062)
 
   return (
     <div className="p-4 max-w-md mx-auto">
-      {/* Карточка погоды */}
       <div className="bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl p-6 text-white shadow-lg text-center">
-        
         <h3 className="text-2xl font-bold mb-1">{weather.city}</h3>
         <p className="text-blue-100 mb-4 capitalize">{weather.description}</p>
         
