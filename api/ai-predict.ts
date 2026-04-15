@@ -1,14 +1,10 @@
-// api/ai-predict.ts (в корне проекта, НЕ в src/pages/api/)
+// api/ai-predict.ts
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import Groq from 'groq-sdk'
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 })
-
-export const config = {
-  runtime: 'nodejs18.x',
-}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*')
