@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { hpaToMmHg } from '../utils/weather'
 
 type WeatherData = {
   temp: number
@@ -93,7 +94,7 @@ export default function WeatherPage() {
   )
   if (!weather) return null
 
-  const pressureMmHg = Math.round(weather.pressure * 0.750062)
+  const pressureMmHg = hpaToMmHg(weather.pressure)
 
   return (
     <div className="p-4 max-w-md mx-auto">

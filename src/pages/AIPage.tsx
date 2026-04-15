@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser } from '../lib/auth'
 import { useNavigate } from 'react-router-dom'
+import { hpaToMmHg } from '../utils/weather'
+import { calculateDistance } from '../utils/geo'
 
 type PredictionMode = 'weather' | 'personal' | 'collective'
 
@@ -76,7 +78,7 @@ export default function AIPage() {
         const currentData = await currentRes.json()
         
         // 🔥 Конвертация давления: гПа → мм рт. ст.
-        const pressureMmHg = Math.round(currentData.main.pressure * 0.750062)
+        const pressureMmHg = hpaToMmHg(currentData.main.pressure)
         
         setWeather({
           temp: currentData.main.temp,
@@ -102,7 +104,7 @@ export default function AIPage() {
           .map((day: any, _index: number) => {
             const date = new Date(day.dt * 1000)
             // 🔥 Конвертация давления для прогноза
-            const pressureMmHg = Math.round(day.main.pressure * 0.750062)
+            const pressureMmHg = hpaToMmHg(day.main.pressure)
             
             return {
               date: date.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }),
@@ -178,19 +180,6 @@ export default function AIPage() {
     }
   }
 
-  // Формула Haversine для расчёта расстояния (в км)
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371
-    const dLat = (lat2 - lat1) * Math.PI / 180
-    const dLon = (lon2 - lon1) * Math.PI / 180
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2)
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
-    return R * c
-  }
-
   // Получение исторической погоды с конвертацией давления в мм рт. ст.
   const getHistoricalWeather = async (lat: number, lon: number, date: string) => {
     try {
@@ -218,7 +207,7 @@ export default function AIPage() {
       
       // 🔥 Конвертация давления: гПа → мм рт. ст.
       const pressureHpa = data.daily?.surface_pressure?.[0]
-      const pressureMmHg = pressureHpa ? Math.round(pressureHpa * 0.750062) : null
+      const pressureMmHg = pressureHpa ? hpaToMmHg(pressureHpa) : null
       
       return {
         temp: data.daily?.temperature_2m_max?.[0] || data.daily?.temperature_2m_mean?.[0] || null,

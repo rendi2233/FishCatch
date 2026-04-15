@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { getCurrentUser } from '../lib/auth'
 import { useNavigate } from 'react-router-dom'
+import { parseTimeOfDay, getTimeLabel } from '../utils/timeOfDay'
 
 type Catch = {
   id: number
@@ -18,26 +19,6 @@ type Catch = {
   location_lng?: number | null
   lure_type?: string | null
   lure_color?: string | null
-}
-
-const getTimeLabel = (time: string) => {
-  switch(time) {
-    case 'night': return 'Ночь'
-    case 'morning': return 'Утро'
-    case 'day': return 'День'
-    case 'evening': return 'Вечер'
-    default: return time
-  }
-}
-
-// 🔥 Парсинг PostgreSQL array literal: {morning,evening} → ['morning', 'evening']
-const parseTimeOfDay = (value: string[] | string | null | undefined): string[] => {
-  if (!value) return []
-  if (Array.isArray(value)) return value
-  if (typeof value === 'string' && value.startsWith('{') && value.endsWith('}')) {
-    return value.slice(1, -1).split(',').filter(t => t)
-  }
-  return [value]
 }
 
 export default function DiaryPage() {

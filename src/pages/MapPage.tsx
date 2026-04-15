@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import { supabase } from '../lib/supabase'
 import L from 'leaflet'
+import { parseTimeOfDay, getTimeLabel } from '../utils/timeOfDay'
 
 // Фикс иконок Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -10,26 +11,6 @@ L.Icon.Default.mergeOptions({
   iconRetinaUrl: new URL('leaflet/dist/images/marker-icon-2x.png', import.meta.url).href,
   shadowUrl: new URL('leaflet/dist/images/marker-shadow.png', import.meta.url).href,
 })
-
-// Парсер времени из базы
-const parseTimeOfDay = (value: string[] | string | null | undefined): string[] => {
-  if (!value) return []
-  if (Array.isArray(value)) return value
-  if (typeof value === 'string' && value.startsWith('{') && value.endsWith('}')) {
-    return value.slice(1, -1).split(',').filter(t => t)
-  }
-  return [value]
-}
-
-const getTimeLabel = (time: string) => {
-  switch(time) {
-    case 'night': return '🌙'
-    case 'morning': return '🌅'
-    case 'day': return '☀️'
-    case 'evening': return '🌇'
-    default: return ''
-  }
-}
 
 type Catch = {
   id: number
@@ -128,7 +109,7 @@ export default function MapPage() {
                     
                     {times.length > 0 && (
                       <div style={{ display: 'flex', gap: 4 }}>
-                        🕐 {times.map((t, i) => <span key={i}>{getTimeLabel(t)}</span>)}
+                        🕐 {times.map((t, i) => <span key={i}>{getTimeLabel(t, 'emoji')}</span>)}
                       </div>
                     )}
                     
