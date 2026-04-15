@@ -171,35 +171,41 @@ export default function AIPage() {
   }
 
   // Получение исторической погоды
-  const getHistoricalWeather = async (lat: number, lon: number, date: string) => {
-    try {
-      const dateOnly = date.split('T')[0]
-      
-      // 🔥 Правильный URL без переноса строки!
-      const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${dateOnly}&end_date=${dateOnly}&daily=temperature_2m_mean,surface_pressure,wind_speed_10m_sum,precipitation_sum&timezone=auto`
-      
-      console.log('🌤️ Fetching weather:', url)
-      
-      const res = await fetch(url)
-      
-      if (!res.ok) {
-        console.error('Open-Meteo error:', res.status, await res.text())
-        return null
-      }
-      
-      const data = await res.json()
-      
-      return {
-        temp: data.daily?.temperature_2m_mean?.[0] || null,
-        pressure: data.daily?.surface_pressure?.[0] || null,
-        wind: data.daily?.wind_speed_10m_sum?.[0] || null,
-        precipitation: data.daily?.precipitation_sum?.[0] || null,
-      }
-    } catch (error) {
-      console.error('Historical weather error:', error)
+const getHistoricalWeather = async (lat: number, lon: number, date: string) => {
+  try {
+    const dateOnly = date.split('T')[0]
+    
+    // 🔥 Упрощённый запрос (только температура и давление)
+    const params = new URLSearchParams({
+      latitude: lat.toString(),
+      longitude: lon.toString(),
+      start_date: dateOnly,
+      end_date: dateOnly,
+      daily: 'temperature_2m_mean,surface_pressure',
+      timezone: 'auto'
+    })
+    
+    const url = `https://archive-api.open-meteo.com/v1/archive?${params.toString()}`
+    
+    const res = await fetch(url)
+    
+    if (!res.ok) {
+      // Не логируем ошибку, просто возвращаем null
       return null
     }
+    
+    const data = await res.json()
+    
+    return {
+      temp: data.daily?.temperature_2m_mean?.[0] || null,
+      pressure: data.daily?.surface_pressure?.[0] || null,
+      wind: null,
+      precipitation: null,
+    }
+  } catch (_error) {
+    return null
   }
+}
 
   const generatePrediction = async () => {
     setLoading(true)
