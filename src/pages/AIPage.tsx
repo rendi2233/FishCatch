@@ -104,6 +104,8 @@ export default function AIPage() {
   // Получение уловов в радиусе 10 км
   const getCatchesInRadius = async (lat: number, lon: number, radiusKm: number = 10) => {
     try {
+      console.log('📍 Searching catches near:', lat, lon, 'within', radiusKm, 'km')
+      
       const {  data, error } = await supabase
         .from('catches')
         .select(`
@@ -124,9 +126,22 @@ export default function AIPage() {
         .order('catch_date', { ascending: false })
         .limit(200)
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase error:', error)
+        throw error
+      }
+
+      console.log('📦 Total catches from DB:', data?.length || 0)
 
       const catches = data || []
+
+      // Логи для отладки
+      catches.forEach((c: any, i: number) => {
+        if (c.location_lat && c.location_lng) {
+          const distance = calculateDistance(lat, lon, c.location_lat, c.location_lng)
+          console.log(`Catch ${i}: ${c.fish_type} at ${c.location_lat}, ${c.location_lng} - distance: ${distance.toFixed(2)} km`)
+        }
+      })
 
       const filteredCatches = catches.filter((c: any) => {
         if (!c.location_lat || !c.location_lng) return false
@@ -134,9 +149,10 @@ export default function AIPage() {
         return distance <= radiusKm
       })
 
+      console.log('✅ Catches within radius:', filteredCatches.length)
       return filteredCatches
-    } catch (_error) {
-      console.error('Error fetching catches:', _error)
+    } catch (error) {
+      console.error('Error fetching catches:', error)
       return []
     }
   }
@@ -158,17 +174,29 @@ export default function AIPage() {
   const getHistoricalWeather = async (lat: number, lon: number, date: string) => {
     try {
       const dateOnly = date.split('T')[0]
-      const res = await fetch(
-        `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${dateOnly}&end_date=${dateOnly}&daily=temperature_2m_mean,surface_pressure,wind_speed_10m_sum,precipitation_sum&timezone=auto`
-      )
+      
+      // 🔥 Правильный URL без переноса строки!
+      const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${dateOnly}&end_date=${dateOnly}&daily=temperature_2m_mean,surface_pressure,wind_speed_10m_sum,precipitation_sum&timezone=auto`
+      
+      console.log('🌤️ Fetching weather:', url)
+      
+      const res = await fetch(url)
+      
+      if (!res.ok) {
+        console.error('Open-Meteo error:', res.status, await res.text())
+        return null
+      }
+      
       const data = await res.json()
+      
       return {
         temp: data.daily?.temperature_2m_mean?.[0] || null,
         pressure: data.daily?.surface_pressure?.[0] || null,
         wind: data.daily?.wind_speed_10m_sum?.[0] || null,
         precipitation: data.daily?.precipitation_sum?.[0] || null,
       }
-    } catch (_error) {
+    } catch (error) {
+      console.error('Historical weather error:', error)
       return null
     }
   }
@@ -356,7 +384,7 @@ ${forecastText}
 
 📅 ПРОГНОЗ ПО ДНЯМ:
 🗓️ [День 1]: 🎯 [X/10] 💡 [...]
-🗓️ [День 2]: 🎯 [X/10] 💡 [...]
+️ [День 2]: 🎯 [X/10] 💡 [...]
 ️ [День 3]: 🎯 [X/10] 💡 [...]
 
 🏆 ЛУЧШИЙ ДЕНЬ: [...]
@@ -397,10 +425,10 @@ ${forecastText}
 
 📅 ПРОГНОЗ ПО ДНЯМ:
 🗓️ [День 1]: 🎯 [X/10] 💡 [...]
-🗓️ [День 2]: 🎯 [X/10] 💡 [...]
+️ [День 2]: 🎯 [X/10] 💡 [...]
 ️ [День 3]: 🎯 [X/10] 💡 [...]
 
-🏆 ЛУЧШИЙ ДЕНЬ: [...]
+ ЛУЧШИЙ ДЕНЬ: [...]
 
 🎣 РЕКОМЕНДАЦИИ:
 🐟 Рыба: [что ловят другие]
@@ -415,16 +443,30 @@ ${forecastText}
       }
 
       // 🔥 ЗАПРОС К СЕРВЕРНОМУ API (безопасно!)
+      console.log('📤 Sending request to /api/ai-predict')
+      console.log('Prompt length:', prompt.length)
+
       const response = await fetch('/api/ai-predict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
       })
 
-      const data = await response.json()
+      console.log('📥 Response status:', response.status)
+
+      const responseText = await response.text()
+      console.log('📥 Response text:', responseText.substring(0, 200))
+
+      let data
+      try {
+        data = JSON.parse(responseText)
+      } catch (e) {
+        console.error('❌ Failed to parse JSON:', e)
+        throw new Error(`Invalid JSON: ${responseText}`)
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || 'Ошибка генерации прогноза')
+        throw new Error(data.error || `API error: ${response.status}`)
       }
 
       setPrediction(data.prediction)
