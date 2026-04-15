@@ -1,12 +1,12 @@
 import { Routes, Route, Link, useLocation } from 'react-router-dom'
 import MapPage from './pages/MapPage'
 import DiaryPage from './pages/DiaryPage'
-import WeatherPage from './pages/WeatherPage'
 import AIPage from './pages/AIPage'
 import AddCatchPage from './pages/AddCatchPage'
 import LocationPicker from './pages/LocationPicker'
 import LoginPage from './pages/LoginPage'
 import AuthStatus from './components/AuthStatus'
+import EditCatchPage from './pages/EditCatchPage'
 
 function NavButton({ to, icon, label }: { to: string; icon: string; label: string }) {
   const location = useLocation()
@@ -32,11 +32,11 @@ function App() {
           <Route path="/" element={<MapPage />} />
           <Route path="/map" element={<MapPage />} />
           <Route path="/diary" element={<DiaryPage />} />
-          <Route path="/weather" element={<WeatherPage />} />
           <Route path="/ai" element={<AIPage />} />
           <Route path="/add-catch" element={<AddCatchPage />} />
           <Route path="/select-location" element={<LocationPicker />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/edit-catch/:id" element={<EditCatchPage />} />
         </Routes>
       </main>
 
@@ -44,7 +44,6 @@ function App() {
         <NavButton to="/add-catch" icon="➕" label="Добавить" />
         <NavButton to="/map" icon="🗺️" label="Карта" />
         <NavButton to="/diary" icon="📖" label="Дневник" />
-        <NavButton to="/weather" icon="☀️" label="Погода" />
         <NavButton to="/ai" icon="🤖" label="ИИ" />
       </nav>
     </div>

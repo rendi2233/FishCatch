@@ -44,6 +44,7 @@ type Catch = {
   bite_rating?: number | null
   duration_hours?: number | null
   time_of_day?: string[] | string | null
+  notes?: string | null  // 🔥 Добавлено поле для заметок
 }
 
 export default function MapPage() {
@@ -111,7 +112,7 @@ export default function MapPage() {
           
           return (
             <Marker key={c.id} position={[c.location_lat, c.location_lng]}>
-              <Popup maxWidth={280}>
+              <Popup maxWidth={300}>
                 <div style={{ fontFamily: 'sans-serif', lineHeight: '1.4', fontSize: '13px' }}>
                   {/* Заголовок: Рыба + Вес */}
                   <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 6, marginBottom: 6 }}>
@@ -133,6 +134,30 @@ export default function MapPage() {
                     
                     {c.lure_type && (
                       <div>🎣 {c.lure_type}{c.lure_color ? ` (${c.lure_color})` : ''}</div>
+                    )}
+                    
+                    {/* 🔥 НОВОЕ: Заметки */}
+                    {c.notes && (
+                      <div style={{ 
+                        marginTop: 8, 
+                        padding: 8, 
+                        backgroundColor: '#f8fafc', 
+                        borderRadius: 6,
+                        borderLeft: '3px solid #3b82f6'
+                      }}>
+                        <strong style={{ fontSize: '12px', color: '#1e40af', display: 'block', marginBottom: 4 }}>
+                          📝 Заметки:
+                        </strong>
+                        <p style={{ 
+                          margin: 0, 
+                          fontSize: '12px', 
+                          color: '#334155',
+                          fontStyle: 'italic',
+                          lineHeight: '1.5'
+                        }}>
+                          {c.notes}
+                        </p>
+                      </div>
                     )}
                     
                     <div style={{ display: 'flex', gap: 12, marginTop: 4, paddingTop: 4, borderTop: '1px dashed #e2e8f0' }}>

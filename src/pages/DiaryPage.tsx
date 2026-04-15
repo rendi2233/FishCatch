@@ -186,7 +186,7 @@ export default function DiaryPage() {
                 </p>
               )}
 
-              {/* Кнопки */}
+              {/* 🔥 Кнопки */}
               <div className="mt-3 flex gap-2 pt-2 border-t border-gray-100">
                 <button
                   onClick={(e) => { e.stopPropagation(); handleViewOnMap(c.location_lat, c.location_lng); }}
@@ -194,6 +194,18 @@ export default function DiaryPage() {
                 >
                   🗺️ На карте
                 </button>
+                
+                {/* ✏️ НОВАЯ КНОПКА: Редактировать */}
+                <button
+                  onClick={(e) => { 
+                    e.stopPropagation()
+                    navigate(`/edit-catch/${c.id}`)
+                  }}
+                  className="flex-1 bg-blue-50 text-blue-700 py-1.5 rounded-lg text-xs font-semibold hover:bg-blue-100"
+                >
+                  ✏️ Ред.
+                </button>
+                
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDelete(c.id, c.fish_type); }}
                   className="flex-1 bg-red-50 text-red-700 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-100"

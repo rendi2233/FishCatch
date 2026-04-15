@@ -13,24 +13,44 @@ export default function AIPage() {
   const [forecast, setForecast] = useState<any[]>([])
   const [apiKeyMissing, setApiKeyMissing] = useState(false)
   const [userLocation, setUserLocation] = useState<{lat: number, lon: number} | null>(null)
+  const [locating, setLocating] = useState(false) // 🔥 Для кнопки обновления
   const navigate = useNavigate()
 
   // Определяем геолокацию при загрузке
   useEffect(() => {
+    fetchUserLocation()
+  }, [])
+
+  // 🔥 Вынесли в отдельную функцию для кнопки
+  const fetchUserLocation = () => {
+    setLocating(true)
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          setUserLocation({
+          const newLocation = {
             lat: pos.coords.latitude,
             lon: pos.coords.longitude
-          })
+          }
+          setUserLocation(newLocation)
+          console.log('📍 Location updated:', newLocation)
+          setLocating(false)
         },
-        () => {
-          setUserLocation({ lat: 55.75, lon: 37.61 })
+        (error) => {
+          console.error('Geolocation error:', error)
+          setUserLocation({ lat: 55.75, lon: 37.61 }) // Москва по умолчанию
+          setLocating(false)
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
         }
       )
+    } else {
+      setUserLocation({ lat: 55.75, lon: 37.61 })
+      setLocating(false)
     }
-  }, [])
+  }
 
   // Получаем погоду и прогноз
   useEffect(() => {
@@ -54,9 +74,14 @@ export default function AIPage() {
         if (!currentRes.ok) throw new Error(`Weather API error: ${currentRes.status}`)
         
         const currentData = await currentRes.json()
+        
+        // 🔥 Конвертация давления: гПа → мм рт. ст.
+        const pressureMmHg = Math.round(currentData.main.pressure * 0.750062)
+        
         setWeather({
           temp: currentData.main.temp,
-          pressure: currentData.main.pressure,
+          pressure: pressureMmHg, // 🔥 Теперь в мм рт. ст.!
+          pressureHpa: currentData.main.pressure,
           humidity: currentData.main.humidity,
           wind: currentData.wind.speed,
           description: currentData.weather[0].description,
@@ -76,13 +101,17 @@ export default function AIPage() {
           .slice(0, 3)
           .map((day: any, _index: number) => {
             const date = new Date(day.dt * 1000)
+            // 🔥 Конвертация давления для прогноза
+            const pressureMmHg = Math.round(day.main.pressure * 0.750062)
+            
             return {
               date: date.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }),
               fullDate: date.toISOString().split('T')[0],
               temp: day.main.temp,
               tempMin: day.main.temp_min,
               tempMax: day.main.temp_max,
-              pressure: day.main.pressure,
+              pressure: pressureMmHg, // 🔥 Теперь в мм рт. ст.!
+              pressureHpa: day.main.pressure,
               humidity: day.main.humidity,
               wind: day.wind.speed,
               description: day.weather[0].description,
@@ -99,7 +128,7 @@ export default function AIPage() {
     if (userLocation) {
       fetchWeatherData()
     }
-  }, [userLocation])
+  }, [userLocation]) // 🔥 Перезагружаем погоду при изменении локации
 
   // Получение уловов в радиусе 10 км
   const getCatchesInRadius = async (lat: number, lon: number, radiusKm: number = 10) => {
@@ -162,14 +191,13 @@ export default function AIPage() {
     return R * c
   }
 
-  // 🔥 ИСПРАВЛЕНО: Получение погоды с конвертацией давления в мм рт. ст.
+  // Получение исторической погоды с конвертацией давления в мм рт. ст.
   const getHistoricalWeather = async (lat: number, lon: number, date: string) => {
     try {
       const dateOnly = date.split('T')[0]
       const today = new Date().toISOString().split('T')[0]
       const isPast = dateOnly < today
       
-      // 🔥 ИСПРАВЛЕНО: temperature_2m_max вместо surface_pressure
       const params = new URLSearchParams({
         latitude: lat.toString(),
         longitude: lon.toString(),
@@ -188,14 +216,14 @@ export default function AIPage() {
       
       const data = await res.json()
       
-      // 🔥 Конвертация давления: гПа → мм рт. ст. (1 гПа = 0.750062 мм рт. ст.)
+      // 🔥 Конвертация давления: гПа → мм рт. ст.
       const pressureHpa = data.daily?.surface_pressure?.[0]
       const pressureMmHg = pressureHpa ? Math.round(pressureHpa * 0.750062) : null
       
       return {
         temp: data.daily?.temperature_2m_max?.[0] || data.daily?.temperature_2m_mean?.[0] || null,
-        pressure: pressureMmHg, // 🔥 Теперь в мм рт. ст.!
-        pressureHpa: pressureHpa, // Сохраняем оригинал для отладки
+        pressure: pressureMmHg,
+        pressureHpa: pressureHpa,
         weatherCode: data.daily?.weather_code?.[0],
       }
     } catch (_error) {
@@ -248,7 +276,7 @@ export default function AIPage() {
 
       // РЕЖИМ 3: Коллективный анализ
       if (mode === 'collective') {
-        collectiveCatches = await getCatchesInRadius(currentLat, currentLon, 10)
+        collectiveCatches = await getCatchesInRadius(currentLat, currentLon, 15)
         
         if (collectiveCatches.length < 5) {
           alert(`📊 В радиусе 10 км найдено только ${collectiveCatches.length} уловов. Нужно минимум 5.`)
@@ -273,7 +301,7 @@ export default function AIPage() {
       const personalWithWeather = await analyzeCatchesWithWeather(personalCatches)
       const collectiveWithWeather = await analyzeCatchesWithWeather(collectiveCatches)
 
-      // 🔥 Анализируем заметки
+      // Анализируем заметки
       const analyzeNotes = (catchList: any[]) => {
         const notesWithContent = catchList.filter((c: any) => c.notes && c.notes.trim())
         const commonPatterns: any = {}
@@ -281,7 +309,6 @@ export default function AIPage() {
         notesWithContent.forEach((c: any) => {
           const notes = c.notes.toLowerCase()
           
-          // Ищем ключевые слова
           if (notes.includes('утро') || notes.includes('рано')) commonPatterns.morning = (commonPatterns.morning || 0) + 1
           if (notes.includes('вечер')) commonPatterns.evening = (commonPatterns.evening || 0) + 1
           if (notes.includes('яма') || notes.includes('глубина')) commonPatterns.depth = (commonPatterns.depth || 0) + 1
@@ -306,7 +333,6 @@ export default function AIPage() {
         stats.personal = {
           total: personalWithWeather.length,
           successful: successful.length,
-          // 🔥 Давление теперь в мм рт. ст. (норма ~760 мм)
           avgTempGood: successful.length > 0 ? Math.round(successful.reduce((sum: number, c: any) => sum + (c.weather?.temp || 15), 0) / successful.length) : 15,
           avgPressureGood: successful.length > 0 ? Math.round(successful.reduce((sum: number, c: any) => sum + (c.weather?.pressure || 760), 0) / successful.length) : 760,
           topFish: Object.entries(successful.reduce((acc: any, c: any) => {
@@ -332,7 +358,6 @@ export default function AIPage() {
           total: collectiveWithWeather.length,
           uniqueFishers: uniqueFishers,
           successful: successful.length,
-          // 🔥 Давление в мм рт. ст.
           avgTempGood: successful.length > 0 ? Math.round(successful.reduce((sum: number, c: any) => sum + (c.weather?.temp || 15), 0) / successful.length) : 15,
           avgPressureGood: successful.length > 0 ? Math.round(successful.reduce((sum: number, c: any) => sum + (c.weather?.pressure || 760), 0) / successful.length) : 760,
           topFish: Object.entries(successful.reduce((acc: any, c: any) => {
@@ -350,12 +375,12 @@ export default function AIPage() {
 
       // Формируем данные для AI
       const currentWeatherText = weather 
-        ? `СЕГОДНЯ (${weather.date}): ${weather.temp}°C, ${weather.description}, давление ${weather.pressure} гПа, влажность ${weather.humidity}%, ветер ${weather.wind} м/с`
+        ? `СЕГОДНЯ (${weather.date}): ${weather.temp}°C, ${weather.description}, давление ${weather.pressure} мм рт. ст., влажность ${weather.humidity}%, ветер ${weather.wind} м/с`
         : 'СЕГОДНЯ: данные о погоде недоступны'
 
       const forecastText = forecast.length > 0
         ? forecast.map((day: any, _i: number) => 
-            `📅 ${day.date} (${day.fullDate}): ${day.temp}°C (min ${day.tempMin}°, max ${day.tempMax}°), ${day.description}, давление ${day.pressure} гПа, влажность ${day.humidity}%, ветер ${day.wind} м/с`
+            `📅 ${day.date} (${day.fullDate}): ${day.temp}°C (min ${day.tempMin}°, max ${day.tempMax}°), ${day.description}, давление ${day.pressure} мм рт. ст., влажность ${day.humidity}%, ветер ${day.wind} м/с`
           ).join('\n')
         : 'ПРОГНОЗ: данные недоступны'
 
@@ -433,10 +458,10 @@ ${forecastText}
 
 📅 ПРОГНОЗ ПО ДНЯМ:
 🗓️ [День 1]: 🎯 [X/10] 💡 [...]
-🗓️ [День 2]: 🎯 [X/10] 💡 [...]
+️ [День 2]: 🎯 [X/10] 💡 [...]
 🗓️ [День 3]: 🎯 [X/10] 💡 [...]
 
-🏆 ЛУЧШИЙ ДЕНЬ: [...]
+ ЛУЧШИЙ ДЕНЬ: [...]
 
 🎣 РЕКОМЕНДАЦИИ:
 🐟 Рыба: [...]
@@ -488,8 +513,8 @@ ${forecastText}
 
 📅 ПРОГНОЗ ПО ДНЯМ:
 🗓️ [День 1]: 🎯 [X/10] 💡 [...]
-️ [День 2]: 🎯 [X/10] 💡 [...]
-🗓️ [День 3]: 🎯 [X/10] 💡 [...]
+🗓️ [День 2]: 🎯 [X/10] 💡 [...]
+️ [День 3]: 🎯 [X/10] 💡 [...]
 
  ЛУЧШИЙ ДЕНЬ: [...]
 
@@ -505,7 +530,7 @@ ${forecastText}
 `
       }
 
-      // 🔥 ЗАПРОС К СЕРВЕРНОМУ API
+      // ЗАПРОС К СЕРВЕРНОМУ API
       console.log('📤 Sending request to /api/ai-predict')
       console.log('Prompt length:', prompt.length)
 
@@ -586,20 +611,41 @@ ${forecastText}
         </button>
       </div>
 
-      {/* Текущая погода */}
+      {/* 🔥 Текущая погода с кнопкой обновления */}
       {weather && (
         <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4 rounded-xl shadow">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-start mb-2">
             <div>
               <p className="text-xs opacity-90">📍 {weather.city}</p>
               <p className="text-xs opacity-75">{weather.date}</p>
+            </div>
+            {/* 🔥 Кнопка обновления геолокации */}
+            <button
+              onClick={fetchUserLocation}
+              disabled={locating}
+              className="bg-white/20 hover:bg-white/30 p-2 rounded-lg transition disabled:opacity-50"
+              title="Обновить местоположение"
+            >
+              {locating ? (
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              ) : (
+                '📍'
+              )}
+            </button>
+          </div>
+          
+          <div className="flex justify-between items-center">
+            <div>
               <p className="text-3xl font-bold">{Math.round(weather.temp)}°C</p>
               <p className="text-sm">{weather.description}</p>
             </div>
             <div className="text-right text-xs space-y-1">
               <p>💨 {weather.wind} м/с</p>
               <p>💧 {weather.humidity}%</p>
-              <p>📊 {weather.pressure} гПа</p>
+              <p>📊 {weather.pressure} мм рт. ст.</p> {/* 🔥 Исправлено */}
             </div>
           </div>
         </div>
@@ -623,7 +669,7 @@ ${forecastText}
                   </div>
                 </div>
                 <div className="flex gap-3 mt-2 text-xs text-gray-500">
-                  <span>📊 {day.pressure} гПа</span>
+                  <span>📊 {day.pressure} мм</span> {/* 🔥 Исправлено */}
                   <span>💧 {day.humidity}%</span>
                   <span>💨 {day.wind} м/с</span>
                 </div>
