@@ -16,6 +16,7 @@ export default function AIPage() {
   const [apiKeyMissing, setApiKeyMissing] = useState(false)
   const [userLocation, setUserLocation] = useState<{lat: number, lon: number} | null>(null)
   const [locating, setLocating] = useState(false) // 🔥 Для кнопки обновления
+  const [radiusKm, setRadiusKm] = useState(15) // 🔥 Радиус поиска для коллективного анализа
   const navigate = useNavigate()
 
   // Определяем геолокацию при загрузке
@@ -265,10 +266,10 @@ export default function AIPage() {
 
       // РЕЖИМ 3: Коллективный анализ
       if (mode === 'collective') {
-        collectiveCatches = await getCatchesInRadius(currentLat, currentLon, 15)
-        
+        collectiveCatches = await getCatchesInRadius(currentLat, currentLon, radiusKm)
+
         if (collectiveCatches.length < 5) {
-          alert(`📊 В радиусе 10 км найдено только ${collectiveCatches.length} уловов. Нужно минимум 5.`)
+          alert(`📊 В радиусе ${radiusKm} км найдено только ${collectiveCatches.length} уловов. Нужно минимум 5.`)
           setLoading(false)
           return
         }
@@ -476,7 +477,7 @@ ${stats.collective.notes.patterns.current ? `• Течение: ${stats.collect
 ` : ''
 
         prompt = `
-ТЫ — ихтиолог-аналитик. Проанализируй данные ВСЕХ рыболовов в радиусе 10 км.
+ТЫ — ихтиолог-аналитик. Проанализируй данные ВСЕХ рыболовов в радиусе ${radiusKm} км.
 
 📊 КОЛЛЕКТИВНАЯ СТАТИСТИКА (${stats.collective?.total || 0} уловов от ${stats.collective?.uniqueFishers || 0} рыбаков):
 • Успешных (клёв 8-10): ${stats.collective?.successful || 0}
@@ -596,9 +597,32 @@ ${forecastText}
               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
           }`}
         >
-          🔗 Коллективный (все рыбаки ±10км)
+          🔗 Коллективный (все рыбаки ±{radiusKm}км)
         </button>
       </div>
+
+      {/* 🔥 Выбор радиуса для коллективного анализа */}
+      {mode === 'collective' && (
+        <div className="bg-white p-4 rounded-xl shadow border border-gray-200">
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-sm font-semibold text-gray-700">📍 Радиус поиска:</label>
+            <span className="text-lg font-bold text-blue-600">{radiusKm} км</span>
+          </div>
+          <input
+            type="range"
+            min="5"
+            max="100"
+            step="5"
+            value={radiusKm}
+            onChange={(e) => setRadiusKm(Number(e.target.value))}
+            className="w-full accent-blue-600"
+          />
+          <div className="flex justify-between text-xs text-gray-400 mt-1">
+            <span>5 км</span>
+            <span>100 км</span>
+          </div>
+        </div>
+      )}
 
       {/* 🔥 Текущая погода с кнопкой обновления */}
       {weather && (
