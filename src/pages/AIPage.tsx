@@ -15,8 +15,8 @@ export default function AIPage() {
   const [forecast, setForecast] = useState<any[]>([])
   const [apiKeyMissing, setApiKeyMissing] = useState(false)
   const [userLocation, setUserLocation] = useState<{lat: number, lon: number} | null>(null)
-  const [locating, setLocating] = useState(false) // 🔥 Для кнопки обновления
-  const [radiusKm, setRadiusKm] = useState(15) // 🔥 Радиус поиска для коллективного анализа
+  const [locating, setLocating] = useState(false)
+  const [radiusKm, setRadiusKm] = useState(15)
   const navigate = useNavigate()
 
   // Определяем геолокацию при загрузке
@@ -24,30 +24,22 @@ export default function AIPage() {
     fetchUserLocation()
   }, [])
 
-  // 🔥 Вынесли в отдельную функцию для кнопки
   const fetchUserLocation = () => {
     setLocating(true)
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          const newLocation = {
-            lat: pos.coords.latitude,
-            lon: pos.coords.longitude
-          }
+          const newLocation = { lat: pos.coords.latitude, lon: pos.coords.longitude }
           setUserLocation(newLocation)
           console.log('📍 Location updated:', newLocation)
           setLocating(false)
         },
         (error) => {
           console.error('Geolocation error:', error)
-          setUserLocation({ lat: 55.75, lon: 37.61 }) // Москва по умолчанию
+          setUserLocation({ lat: 55.75, lon: 37.61 })
           setLocating(false)
         },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
-        }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       )
     } else {
       setUserLocation({ lat: 55.75, lon: 37.61 })
@@ -73,17 +65,13 @@ export default function AIPage() {
         const currentRes = await fetch(
           `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&lang=ru`
         )
-        
         if (!currentRes.ok) throw new Error(`Weather API error: ${currentRes.status}`)
-        
         const currentData = await currentRes.json()
-        
-        // 🔥 Конвертация давления: гПа → мм рт. ст.
         const pressureMmHg = hpaToMmHg(currentData.main.pressure)
         
         setWeather({
           temp: currentData.main.temp,
-          pressure: pressureMmHg, // 🔥 Теперь в мм рт. ст.!
+          pressure: pressureMmHg,
           pressureHpa: currentData.main.pressure,
           humidity: currentData.main.humidity,
           wind: currentData.wind.speed,
@@ -95,25 +83,22 @@ export default function AIPage() {
         const forecastRes = await fetch(
           `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&lang=ru`
         )
-        
         if (!forecastRes.ok) throw new Error(`Forecast API error: ${forecastRes.status}`)
-        
         const forecastData = await forecastRes.json()
+        
         const dailyForecast = forecastData.list
           .filter((item: any) => item.dt_txt.includes('12:00:00'))
           .slice(0, 3)
           .map((day: any, _index: number) => {
             const date = new Date(day.dt * 1000)
-            // 🔥 Конвертация давления для прогноза
             const pressureMmHg = hpaToMmHg(day.main.pressure)
-            
             return {
               date: date.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }),
               fullDate: date.toISOString().split('T')[0],
               temp: day.main.temp,
               tempMin: day.main.temp_min,
               tempMax: day.main.temp_max,
-              pressure: pressureMmHg, // 🔥 Теперь в мм рт. ст.!
+              pressure: pressureMmHg,
               pressureHpa: day.main.pressure,
               humidity: day.main.humidity,
               wind: day.wind.speed,
@@ -128,51 +113,28 @@ export default function AIPage() {
       }
     }
 
-    if (userLocation) {
-      fetchWeatherData()
-    }
-  }, [userLocation]) // 🔥 Перезагружаем погоду при изменении локации
+    if (userLocation) fetchWeatherData()
+  }, [userLocation])
 
-  // Получение уловов в радиусе 10 км
+  // Получение уловов в радиусе
   const getCatchesInRadius = async (lat: number, lon: number, radiusKm: number = 10) => {
     try {
       console.log('📍 Searching catches near:', lat, lon, 'within', radiusKm, 'km')
       
-      const {  data, error } = await supabase
+      const { data, error } = await supabase
         .from('catches')
-        .select(`
-          fish_type,
-          weight,
-          bite_rating,
-          lure_type,
-          lure_color,
-          catch_date,
-          location_lat,
-          location_lng,
-          time_of_day,
-          notes,
-          user_id
-        `)
+        .select(`fish_type, weight, bite_rating, lure_type, lure_color, catch_date, location_lat, location_lng, time_of_day, notes, user_id`)
         .not('location_lat', 'is', null)
         .not('location_lng', 'is', null)
         .order('catch_date', { ascending: false })
         .limit(200)
 
-      if (error) {
-        console.error('Supabase error:', error)
-        throw error
-      }
-
-      console.log('📦 Total catches from DB:', data?.length || 0)
-
+      if (error) throw error
       const catches = data || []
-
       const filteredCatches = catches.filter((c: any) => {
         if (!c.location_lat || !c.location_lng) return false
-        const distance = calculateDistance(lat, lon, c.location_lat, c.location_lng)
-        return distance <= radiusKm
+        return calculateDistance(lat, lon, c.location_lat, c.location_lng) <= radiusKm
       })
-
       console.log('✅ Catches within radius:', filteredCatches.length)
       return filteredCatches
     } catch (error) {
@@ -181,7 +143,7 @@ export default function AIPage() {
     }
   }
 
-  // Получение исторической погоды с конвертацией давления в мм рт. ст.
+  // Получение исторической погоды
   const getHistoricalWeather = async (lat: number, lon: number, date: string) => {
     try {
       const dateOnly = date.split('T')[0]
@@ -203,10 +165,8 @@ export default function AIPage() {
       
       const res = await fetch(apiUrl)
       if (!res.ok) return null
-      
       const data = await res.json()
       
-      // 🔥 Конвертация давления: гПа → мм рт. ст.
       const pressureHpa = data.daily?.surface_pressure?.[0]
       const pressureMmHg = pressureHpa ? hpaToMmHg(pressureHpa) : null
       
@@ -240,23 +200,15 @@ export default function AIPage() {
       let collectiveCatches: any[] = []
       let stats: any = {}
 
-      // РЕЖИМ 1: Только погода
-      if (mode === 'weather') {
-        // Без анализа уловов
-      }
-
-      // РЕЖИМ 2: Личный анализ
       if (mode === 'personal' || mode === 'collective') {
-        const {  data, error } = await supabase
+        const { data, error } = await supabase
           .from('catches')
           .select('fish_type, weight, bite_rating, lure_type, lure_color, catch_date, location_lat, location_lng, time_of_day, notes')
           .eq('user_id', user.id)
           .order('catch_date', { ascending: false })
           .limit(30)
-
         if (error) throw error
         personalCatches = data || []
-
         if (personalCatches.length < 3 && mode === 'personal') {
           alert('📊 Нужно минимум 3 улова для анализа!')
           setLoading(false)
@@ -264,10 +216,8 @@ export default function AIPage() {
         }
       }
 
-      // РЕЖИМ 3: Коллективный анализ
       if (mode === 'collective') {
         collectiveCatches = await getCatchesInRadius(currentLat, currentLon, radiusKm)
-
         if (collectiveCatches.length < 5) {
           alert(`📊 В радиусе ${radiusKm} км найдено только ${collectiveCatches.length} уловов. Нужно минимум 5.`)
           setLoading(false)
@@ -275,7 +225,6 @@ export default function AIPage() {
         }
       }
 
-      // Анализируем погоду для уловов
       const analyzeCatchesWithWeather = async (catchList: any[]) => {
         return await Promise.all(
           catchList.map(async (c: any) => {
@@ -291,14 +240,11 @@ export default function AIPage() {
       const personalWithWeather = await analyzeCatchesWithWeather(personalCatches)
       const collectiveWithWeather = await analyzeCatchesWithWeather(collectiveCatches)
 
-      // Анализируем заметки
       const analyzeNotes = (catchList: any[]) => {
         const notesWithContent = catchList.filter((c: any) => c.notes && c.notes.trim())
         const commonPatterns: any = {}
-        
         notesWithContent.forEach((c: any) => {
           const notes = c.notes.toLowerCase()
-          
           if (notes.includes('утро') || notes.includes('рано')) commonPatterns.morning = (commonPatterns.morning || 0) + 1
           if (notes.includes('вечер')) commonPatterns.evening = (commonPatterns.evening || 0) + 1
           if (notes.includes('яма') || notes.includes('глубина')) commonPatterns.depth = (commonPatterns.depth || 0) + 1
@@ -307,7 +253,6 @@ export default function AIPage() {
           if (notes.includes('клевало') || notes.includes('брало')) commonPatterns.active = (commonPatterns.active || 0) + 1
           if (notes.includes('не клевало') || notes.includes('не брало')) commonPatterns.inactive = (commonPatterns.inactive || 0) + 1
         })
-        
         return {
           totalNotes: notesWithContent.length,
           patterns: commonPatterns,
@@ -315,55 +260,36 @@ export default function AIPage() {
         }
       }
 
-      // Статистика для личных уловов
       if (personalWithWeather.length > 0) {
         const successful = personalWithWeather.filter((c: any) => (c.bite_rating || 0) >= 7)
         const notesAnalysis = analyzeNotes(personalWithWeather)
-        
         stats.personal = {
           total: personalWithWeather.length,
           successful: successful.length,
           avgTempGood: successful.length > 0 ? Math.round(successful.reduce((sum: number, c: any) => sum + (c.weather?.temp || 15), 0) / successful.length) : 15,
           avgPressureGood: successful.length > 0 ? Math.round(successful.reduce((sum: number, c: any) => sum + (c.weather?.pressure || 760), 0) / successful.length) : 760,
-          topFish: Object.entries(successful.reduce((acc: any, c: any) => {
-            acc[c.fish_type] = (acc[c.fish_type] || 0) + 1
-            return acc
-          }, {})).sort((a: any, b: any) => b[1] - a[1]).slice(0, 3).map((x: any) => x[0]).join(', ') || 'Не определена',
-          topLure: Object.entries(successful.reduce((acc: any, c: any) => {
-            const key = `${c.lure_type || ''} ${c.lure_color || ''}`.trim()
-            if (key) acc[key] = (acc[key] || 0) + 1
-            return acc
-          }, {})).sort((a: any, b: any) => b[1] - a[1]).slice(0, 3).map((x: any) => x[0]).join(', ') || 'Не определена',
+          topFish: Object.entries(successful.reduce((acc: any, c: any) => { acc[c.fish_type] = (acc[c.fish_type] || 0) + 1; return acc }, {})).sort((a: any, b: any) => b[1] - a[1]).slice(0, 3).map((x: any) => x[0]).join(', ') || 'Не определена',
+          topLure: Object.entries(successful.reduce((acc: any, c: any) => { const key = `${c.lure_type || ''} ${c.lure_color || ''}`.trim(); if (key) acc[key] = (acc[key] || 0) + 1; return acc }, {})).sort((a: any, b: any) => b[1] - a[1]).slice(0, 3).map((x: any) => x[0]).join(', ') || 'Не определена',
           notes: notesAnalysis,
         }
       }
 
-      // Статистика для коллективных уловов
       if (collectiveWithWeather.length > 0) {
         const successful = collectiveWithWeather.filter((c: any) => (c.bite_rating || 0) >= 7)
         const uniqueFishers = new Set(collectiveWithWeather.map((c: any) => c.user_id)).size
         const notesAnalysis = analyzeNotes(collectiveWithWeather)
-        
         stats.collective = {
           total: collectiveWithWeather.length,
           uniqueFishers: uniqueFishers,
           successful: successful.length,
           avgTempGood: successful.length > 0 ? Math.round(successful.reduce((sum: number, c: any) => sum + (c.weather?.temp || 15), 0) / successful.length) : 15,
           avgPressureGood: successful.length > 0 ? Math.round(successful.reduce((sum: number, c: any) => sum + (c.weather?.pressure || 760), 0) / successful.length) : 760,
-          topFish: Object.entries(successful.reduce((acc: any, c: any) => {
-            acc[c.fish_type] = (acc[c.fish_type] || 0) + 1
-            return acc
-          }, {})).sort((a: any, b: any) => b[1] - a[1]).slice(0, 3).map((x: any) => x[0]).join(', ') || 'Не определена',
-          topLure: Object.entries(successful.reduce((acc: any, c: any) => {
-            const key = `${c.lure_type || ''} ${c.lure_color || ''}`.trim()
-            if (key) acc[key] = (acc[key] || 0) + 1
-            return acc
-          }, {})).sort((a: any, b: any) => b[1] - a[1]).slice(0, 3).map((x: any) => x[0]).join(', ') || 'Не определена',
+          topFish: Object.entries(successful.reduce((acc: any, c: any) => { acc[c.fish_type] = (acc[c.fish_type] || 0) + 1; return acc }, {})).sort((a: any, b: any) => b[1] - a[1]).slice(0, 3).map((x: any) => x[0]).join(', ') || 'Не определена',
+          topLure: Object.entries(successful.reduce((acc: any, c: any) => { const key = `${c.lure_type || ''} ${c.lure_color || ''}`.trim(); if (key) acc[key] = (acc[key] || 0) + 1; return acc }, {})).sort((a: any, b: any) => b[1] - a[1]).slice(0, 3).map((x: any) => x[0]).join(', ') || 'Не определена',
           notes: notesAnalysis,
         }
       }
 
-      // Формируем данные для AI
       const currentWeatherText = weather 
         ? `СЕГОДНЯ (${weather.date}): ${weather.temp}°C, ${weather.description}, давление ${weather.pressure} мм рт. ст., влажность ${weather.humidity}%, ветер ${weather.wind} м/с`
         : 'СЕГОДНЯ: данные о погоде недоступны'
@@ -374,149 +300,169 @@ export default function AIPage() {
           ).join('\n')
         : 'ПРОГНОЗ: данные недоступны'
 
-      // Формируем промпт
+      // 🔥 ФОРМИРУЕМ ПРОМПТЫ С АКЦЕНТОМ НА ЛОГИКУ, А НЕ ЗАМЕТКИ
       let prompt = ''
 
       if (mode === 'weather') {
         prompt = `
-ТЫ — профессиональный ихтиолог. Дай прогноз ТОЛЬКО на основе погоды.
+ТЫ — профессиональный ихтиолог с 20-летним опытом. Дай прогноз ТОЛЬКО на основе метеоданных и ихтиологических знаний.
 
 ${currentWeatherText}
 
 ${forecastText}
 
-🎯 ДАЙ ПРОГНОЗ на 3 дня:
-1. Стоит ли ехать на рыбалку?
-2. Какую рыбу ловить?
-3. На что ловить?
-4. Лучшее время суток?
+🎯 ЗАДАЧА:
+1. Проанализируй текущую погоду и прогноз на 3 дня
+2. Оцени влияние температуры, давления, влажности и ветра на активность рыбы
+3. Дай рекомендации на основе научных данных, а не домыслов
 
-📋 ФОРМАТ:
-🔮 ОБЩИЙ ВЫВОД: [...]
+📋 ФОРМАТ ОТВЕТА:
+🔮 ОБЩИЙ ВЫВОД: [2-3 предложения, основанные на метеоданных]
 
 📅 ПРОГНОЗ ПО ДНЯМ:
-🗓️ [День 1]:
-   🎯 Шанс: [X/10]
-   💡 Совет: [...]
+🗓️ [День 1]: 🎯 [Шанс 1-10] 💡 [Совет на основе погоды]
+🗓️ [День 2]: 🎯 [Шанс 1-10] 💡 [Совет на основе погоды]
+🗓️ [День 3]: 🎯 [Шанс 1-10] 💡 [Совет на основе погоды]
 
-🗓️ [День 2]:
-   🎯 Шанс: [X/10]
-   💡 Совет: [...]
+🎣 РЕКОМЕНДАЦИИ: [Рыба, приманка, время, место — всё на основе метеоданных]
 
-🗓️ [День 3]:
-   🎯 Шанс: [X/10]
-   💡 Совет: [...]
-
-🎣 РЕКОМЕНДАЦИИ: [...]
+⚠️ Важно: Игнорируй субъективные мнения. Оперируй только фактами о погоде и биологии рыб.
 
 Отвечай на русском, используй эмодзи.
 `
       } else if (mode === 'personal') {
         const notesText = stats.personal?.notes?.totalNotes > 0 ? `
-📝 ЗАМЕТКИ РЫБОЛОВА (${stats.personal.notes.totalNotes} записей):
+📝 ЗАМЕТКИ РЫБОЛОВА (СУБЪЕКТИВНЫЕ НАБЛЮДЕНИЯ):
 ${stats.personal.notes.sampleNotes}
 
-📊 АНАЛИЗ ЗАМЕТОК:
-${stats.personal.notes.patterns.morning ? `• Утренние рыбалки: ${stats.personal.notes.patterns.morning}` : ''}
-${stats.personal.notes.patterns.evening ? `• Вечерние рыбалки: ${stats.personal.notes.patterns.evening}` : ''}
-${stats.personal.notes.patterns.depth ? `• Глубокие места (ямы): ${stats.personal.notes.patterns.depth}` : ''}
-${stats.personal.notes.patterns.vegetation ? `• Растительность (камыш, трава): ${stats.personal.notes.patterns.vegetation}` : ''}
-${stats.personal.notes.patterns.current ? `• Течение: ${stats.personal.notes.patterns.current}` : ''}
-${stats.personal.notes.patterns.active ? `• Активный клёв: ${stats.personal.notes.patterns.active}` : ''}
-${stats.personal.notes.patterns.inactive ? `• Неактивный клёв: ${stats.personal.notes.patterns.inactive}` : ''}
+📊 ЧАСТОТА УПОМИНАНИЙ В ЗАМЕТКАХ:
+${stats.personal.notes.patterns.morning ? `• Утро: ${stats.personal.notes.patterns.morning} раз` : ''}
+${stats.personal.notes.patterns.evening ? `• Вечер: ${stats.personal.notes.patterns.evening} раз` : ''}
+${stats.personal.notes.patterns.depth ? `• Глубина/ямы: ${stats.personal.notes.patterns.depth} раз` : ''}
+${stats.personal.notes.patterns.vegetation ? `• Растительность: ${stats.personal.notes.patterns.vegetation} раз` : ''}
+${stats.personal.notes.patterns.current ? `• Течение: ${stats.personal.notes.patterns.current} раз` : ''}
 ` : ''
 
         prompt = `
-ТЫ — ихтиолог с 20-летним опытом. Проанализируй ЛИЧНЫЙ опыт рыболова.
+ТЫ — ихтиолог-аналитик с 20-летним опытом. Твоя задача — проанализировать ДАННЫЕ, а не верить на слово заметкам.
 
-📊 ТВОЯ СТАТИСТИКА:
+📊 ОБЪЕКТИВНАЯ СТАТИСТИКА (ФАКТЫ):
 • Всего уловов: ${stats.personal?.total || 0}
-• Успешных (клёв 8-10): ${stats.personal?.successful || 0}
-• При хорошем клёве: ${stats.personal?.avgTempGood}°C, ${stats.personal?.avgPressureGood} мм рт. ст.
-• Лучшая рыба: ${stats.personal?.topFish}
-• Лучшая приманка: ${stats.personal?.topLure}
+• Успешных (клёв 8-10/10): ${stats.personal?.successful || 0}
+• При хорошем клёве средняя температура: ${stats.personal?.avgTempGood}°C
+• При хорошем клёве среднее давление: ${stats.personal?.avgPressureGood} мм рт. ст.
+• Самые уловистые рыбы: ${stats.personal?.topFish}
+• Самые рабочие приманки: ${stats.personal?.topLure}
+
+${notesText ? `
+⚠️ ЗАМЕТКИ РЫБОЛОВА (СУБЪЕКТИВНО, НЕ ФАКТ):
 ${notesText}
+❗ Используй заметки ТОЛЬКО как дополнительный контекст. Не принимай их за истину.
+❗ Если заметки противоречат статистике — доверяй статистике.
+❗ Критически оценивай: "рыбак писал, что утром клевало" ≠ "утром всегда клюёт".
+` : ''}
 
+🌤️ ТЕКУЩАЯ ПОГОДА И ПРОГНОЗ:
 ${currentWeatherText}
-
 ${forecastText}
 
-🎯 СРАВНИ погоду с твоими успешными днями и дай прогноз, учитывая заметки!
+🎯 ТВОЯ ЗАДАЧА:
+1. 🔍 Сначала проанализируй объективные данные: при какой погоде был хороший клёв?
+2. 🧠 Затем примени ихтиологическую логику: как текущая погода соотносится с успешными днями?
+3. 📝 Только потом, если уместно, учти заметки — но с критической оценкой.
+4. 💡 Дай прогноз, основанный на данных + логике, а не на мнениях.
 
-📋 ФОРМАТ:
-🔮 ВЫВОД: [...]
+📋 СТРОГИЙ ФОРМАТ ОТВЕТА:
+🔮 ВЫВОД: [На основе статистики и погоды. Если заметки противоречат данным — объясни почему им не стоит доверять.]
 
 📅 ПРОГНОЗ ПО ДНЯМ:
-🗓️ [День 1]: 🎯 [X/10] 💡 [...]
-️ [День 2]: 🎯 [X/10] 💡 [...]
-🗓️ [День 3]: 🎯 [X/10] 💡 [...]
+🗓️ [День 1]: 🎯 [1-10] 💡 [Рекомендация на основе данных + погоды]
+🗓️ [День 2]: 🎯 [1-10] 💡 [Рекомендация на основе данных + погоды]
+🗓️ [День 3]: 🎯 [1-10] 💡 [Рекомендация на основе данных + погоды]
 
- ЛУЧШИЙ ДЕНЬ: [...]
+🏆 ЛУЧШИЙ ДЕНЬ: [Обоснование через статистику и метеоданные]
 
 🎣 РЕКОМЕНДАЦИИ:
-🐟 Рыба: [...]
-🎣 Приманка: [...]
-🕐 Время: [...]
-📍 Место: [...]
+🐟 Рыба: [На основе успешных уловов]
+🎣 Приманка: [На основе успешных уловов]
+🕐 Время: [На основе корреляции времени и клёва]
+📍 Место: [На основе данных, а не "рыбак сказал"]
 
-📈 ПОЧЕМУ: [на основе твоей статистики И ЗАМЕТОК]
+📈 АНАЛИЗ: [Чётко: "При давлении ~${stats.personal?.avgPressureGood} мм у тебя щука клюёт на ${stats.personal?.successful}/${stats.personal?.total}. Сейчас давление ${weather?.pressure} мм → вывод: ..."]
 
-На русском, с эмодзи.
+❗ Если заметки говорят одно, а статистика другое — явно укажи: "Заметки могут вводить в заблуждение, потому что..."
+
+Отвечай на русском, используй эмодзи, будь конкретен и критичен.
 `
       } else if (mode === 'collective') {
         const notesText = stats.collective?.notes?.totalNotes > 0 ? `
-📝 ОБЩИЕ ЗАМЕТКИ (${stats.collective.notes.totalNotes} записей от рыбаков):
+📝 ОБЩИЕ ЗАМЕТКИ РЫБАКОВ (СУБЪЕКТИВНО, НЕ ФАКТ):
 ${stats.collective.notes.sampleNotes}
 
-📊 АНАЛИЗ ЗАМЕТОК:
+📊 ЧАСТОТА УПОМИНАНИЙ:
 ${stats.collective.notes.patterns.morning ? `• Утро: ${stats.collective.notes.patterns.morning}` : ''}
 ${stats.collective.notes.patterns.evening ? `• Вечер: ${stats.collective.notes.patterns.evening}` : ''}
-${stats.collective.notes.patterns.depth ? `• Глубина/ямы: ${stats.collective.notes.patterns.depth}` : ''}
+${stats.collective.notes.patterns.depth ? `• Глубина: ${stats.collective.notes.patterns.depth}` : ''}
 ${stats.collective.notes.patterns.vegetation ? `• Растительность: ${stats.collective.notes.patterns.vegetation}` : ''}
 ${stats.collective.notes.patterns.current ? `• Течение: ${stats.collective.notes.patterns.current}` : ''}
 ` : ''
 
         prompt = `
-ТЫ — ихтиолог-аналитик. Проанализируй данные ВСЕХ рыболовов в радиусе ${radiusKm} км.
+ТЫ — ихтиолог-аналитик. Твоя задача — найти объективные закономерности в данных МНОГИХ рыбаков, а не суммировать их мнения.
 
-📊 КОЛЛЕКТИВНАЯ СТАТИСТИКА (${stats.collective?.total || 0} уловов от ${stats.collective?.uniqueFishers || 0} рыбаков):
+📊 КОЛЛЕКТИВНАЯ СТАТИСТИКА (ОБЪЕКТИВНЫЕ ДАННЫЕ):
+• Уловов: ${stats.collective?.total || 0} от ${stats.collective?.uniqueFishers || 0} рыбаков в радиусе ${radiusKm} км
 • Успешных (клёв 8-10): ${stats.collective?.successful || 0}
 • При хорошем клёве: ${stats.collective?.avgTempGood}°C, ${stats.collective?.avgPressureGood} мм рт. ст.
-• Лучшая рыба: ${stats.collective?.topFish}
-• Лучшая приманка: ${stats.collective?.topLure}
+• Лучшие рыбы: ${stats.collective?.topFish}
+• Лучшие приманки: ${stats.collective?.topLure}
+
+${notesText ? `
+⚠️ ЗАМЕТКИ РЫБАКОВ (СУБЪЕКТИВНО):
 ${notesText}
+❗ Заметки — это мнения, а не данные. Один рыбак мог ошибиться, другой — преувеличить.
+❗ Ищи паттерны в статистике, а не в словах.
+❗ Если 10 рыбаков пишут "утром клюёт", но статистика показывает равный клёв утром/вечером — доверяй статистике.
+` : ''}
 
 ${stats.personal ? `
 📊 ТВОЯ ЛИЧНАЯ СТАТИСТИКА (${stats.personal.total} уловов):
-• Лучшая рыба: ${stats.personal.topFish}
-• Лучшая приманка: ${stats.personal.topLure}
+• Лучшие рыбы: ${stats.personal.topFish}
+• Лучшие приманки: ${stats.personal.topLure}
 ` : ''}
 
+🌤️ ПОГОДА СЕЙЧАС И ПРОГНОЗ:
 ${currentWeatherText}
-
 ${forecastText}
 
-🎯 СРАВНИ коллективный опыт с текущей погодой и дай прогноз, учитывая заметки!
+🎯 ТВОЯ ЗАДАЧА:
+1. 📈 Найди корреляции в данных: при какой погоде/давлении/температуре уловы были лучше?
+2. 🧠 Примени ихтиологическую логику: почему так могло быть? (сезон, вид рыбы, поведение)
+3. 🔍 Сравни с текущей погодой: какие дни из прогноза ближе к "успешным" условиям?
+4. 📝 Заметки используй ТОЛЬКО как гипотезы для проверки, а не как факты.
+5. 💡 Если заметки противоречат статистике — явно укажи это и объясни, почему данные надёжнее.
 
-📋 ФОРМАТ:
-🔮 ВЫВОД: [на основе ${stats.collective?.total} уловов ${stats.collective?.uniqueFishers} рыбаков]
+📋 СТРОГИЙ ФОРМАТ ОТВЕТА:
+🔮 ВЫВОД: [На основе статистики ${stats.collective?.total} уловов. Если заметки вводят в заблуждение — скажи об этом.]
 
 📅 ПРОГНОЗ ПО ДНЯМ:
-🗓️ [День 1]: 🎯 [X/10] 💡 [...]
-🗓️ [День 2]: 🎯 [X/10] 💡 [...]
-️ [День 3]: 🎯 [X/10] 💡 [...]
+🗓️ [День 1]: 🎯 [1-10] 💡 [Рекомендация на основе данных + погоды]
+🗓️ [День 2]: 🎯 [1-10] 💡 [Рекомендация на основе данных + погоды]
+🗓️ [День 3]: 🎯 [1-10] 💡 [Рекомендация на основе данных + погоды]
 
- ЛУЧШИЙ ДЕНЬ: [...]
+🏆 ЛУЧШИЙ ДЕНЬ: [Обоснование через корреляцию погоды и успешных уловов]
 
 🎣 РЕКОМЕНДАЦИИ:
-🐟 Рыба: [что ловят другие]
-🎣 Приманка: [что работает]
-🕐 Время: [...]
-📍 Место: [где искать, учитывая заметки]
+🐟 Рыба: [На основе статистики уловов]
+🎣 Приманка: [На основе статистики уловов]
+🕐 Время: [На основе корреляции времени и клёва]
+📍 Место: [На основе данных, а не "рыбаки писали"]
 
-📈 ПОЧЕМУ: [при давлении X уловы были Y/10, рыбаки отмечали Z]
+📈 АНАЛИЗ: [Чётко: "При давлении ~${stats.collective?.avgPressureGood} мм уловы были выше на X%. Сейчас давление ${weather?.pressure} мм → вывод: ..."]
 
-На русском, с эмодзи.
+❗ КРИТИЧЕСКАЯ ОЦЕНКА: [Если заметки противоречат данным: "Рыбаки часто писали про утро, но статистика показывает, что клёв равномерный. Возможно, это субъективное восприятие."]
+
+Отвечай на русском, используй эмодзи, будь аналитиком, а не пересказчиком мнений.
 `
       }
 
@@ -531,7 +477,6 @@ ${forecastText}
       })
 
       console.log('📥 Response status:', response.status)
-
       const responseText = await response.text()
       console.log('📥 Response text:', responseText.substring(0, 200))
 
@@ -601,7 +546,7 @@ ${forecastText}
         </button>
       </div>
 
-      {/* 🔥 Выбор радиуса для коллективного анализа */}
+      {/* Выбор радиуса для коллективного анализа */}
       {mode === 'collective' && (
         <div className="bg-white p-4 rounded-xl shadow border border-gray-200">
           <div className="flex justify-between items-center mb-2">
@@ -624,7 +569,7 @@ ${forecastText}
         </div>
       )}
 
-      {/* 🔥 Текущая погода с кнопкой обновления */}
+      {/* Текущая погода с кнопкой обновления */}
       {weather && (
         <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4 rounded-xl shadow">
           <div className="flex justify-between items-start mb-2">
@@ -632,7 +577,6 @@ ${forecastText}
               <p className="text-xs opacity-90">📍 {weather.city}</p>
               <p className="text-xs opacity-75">{weather.date}</p>
             </div>
-            {/* 🔥 Кнопка обновления геолокации */}
             <button
               onClick={fetchUserLocation}
               disabled={locating}
@@ -649,7 +593,6 @@ ${forecastText}
               )}
             </button>
           </div>
-          
           <div className="flex justify-between items-center">
             <div>
               <p className="text-3xl font-bold">{Math.round(weather.temp)}°C</p>
@@ -658,7 +601,7 @@ ${forecastText}
             <div className="text-right text-xs space-y-1">
               <p>💨 {weather.wind} м/с</p>
               <p>💧 {weather.humidity}%</p>
-              <p>📊 {weather.pressure} мм рт. ст.</p> {/* 🔥 Исправлено */}
+              <p>📊 {weather.pressure} мм рт. ст.</p>
             </div>
           </div>
         </div>
@@ -682,7 +625,7 @@ ${forecastText}
                   </div>
                 </div>
                 <div className="flex gap-3 mt-2 text-xs text-gray-500">
-                  <span>📊 {day.pressure} мм</span> {/* 🔥 Исправлено */}
+                  <span>📊 {day.pressure} мм</span>
                   <span>💧 {day.humidity}%</span>
                   <span>💨 {day.wind} м/с</span>
                 </div>
