@@ -32,6 +32,7 @@ export default function MapPage() {
   const [catches, setCatches] = useState<Catch[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedLocation, setSelectedLocation] = useState<[number, number] | null>(null)
+  const [userCenter, setUserCenter] = useState<[number, number] | null>(null) // 🔥 Геолокация пользователя
 
   useEffect(() => {
     const savedLocation = localStorage.getItem('viewLocation')
@@ -45,6 +46,13 @@ export default function MapPage() {
       }
     }
     loadCatches()
+    // 🔥 Определяем геолокацию для центрирования карты
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setUserCenter([pos.coords.latitude, pos.coords.longitude]),
+        () => {} // Тихо игнорируем ошибку — будет fallback
+      )
+    }
   }, [])
 
   const loadCatches = async () => {
@@ -67,8 +75,8 @@ export default function MapPage() {
 
   if (loading) return <div className="p-4 text-center">⏳ Загружаем карту...</div>
 
-  const defaultCenter: [number, number] = selectedLocation || [55.75, 37.61]
-  const defaultZoom = selectedLocation ? 15 : 10
+  const defaultCenter: [number, number] = selectedLocation || userCenter || [55.75, 37.61]
+  const defaultZoom = selectedLocation ? 15 : userCenter ? 13 : 10
 
   return (
     <div className="h-[calc(100vh-140px)]">
