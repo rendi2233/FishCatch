@@ -162,43 +162,41 @@ export default function AIPage() {
     return R * c
   }
 
-  // 🔥 ИСПРАВЛЕНО: Получение погоды (архив или прогноз)
+  // 🔥 ИСПРАВЛЕНО: Получение погоды с конвертацией давления в мм рт. ст.
   const getHistoricalWeather = async (lat: number, lon: number, date: string) => {
     try {
       const dateOnly = date.split('T')[0]
       const today = new Date().toISOString().split('T')[0]
-      
-      // 🔥 Проверяем, прошлая это дата или будущая
       const isPast = dateOnly < today
       
-      // Параметры запроса
+      // 🔥 ИСПРАВЛЕНО: temperature_2m_max вместо surface_pressure
       const params = new URLSearchParams({
         latitude: lat.toString(),
         longitude: lon.toString(),
         start_date: dateOnly,
         end_date: dateOnly,
-        daily: 'temperature_2m_mean,surface_pressure',
+        daily: 'temperature_2m_max,weather_code',
         timezone: 'auto'
       })
       
-      // 🔥 Разные API для архива и прогноза
       const apiUrl = isPast 
         ? `https://archive-api.open-meteo.com/v1/archive?${params.toString()}`
         : `https://api.open-meteo.com/v1/forecast?${params.toString()}`
       
       const res = await fetch(apiUrl)
-      
-      if (!res.ok) {
-        return null
-      }
+      if (!res.ok) return null
       
       const data = await res.json()
       
+      // 🔥 Конвертация давления: гПа → мм рт. ст. (1 гПа = 0.750062 мм рт. ст.)
+      const pressureHpa = data.daily?.surface_pressure?.[0]
+      const pressureMmHg = pressureHpa ? Math.round(pressureHpa * 0.750062) : null
+      
       return {
-        temp: data.daily?.temperature_2m_mean?.[0] || null,
-        pressure: data.daily?.surface_pressure?.[0] || null,
-        wind: null,
-        precipitation: null,
+        temp: data.daily?.temperature_2m_max?.[0] || data.daily?.temperature_2m_mean?.[0] || null,
+        pressure: pressureMmHg, // 🔥 Теперь в мм рт. ст.!
+        pressureHpa: pressureHpa, // Сохраняем оригинал для отладки
+        weatherCode: data.daily?.weather_code?.[0],
       }
     } catch (_error) {
       return null
@@ -308,6 +306,7 @@ export default function AIPage() {
         stats.personal = {
           total: personalWithWeather.length,
           successful: successful.length,
+          // 🔥 Давление теперь в мм рт. ст. (норма ~760 мм)
           avgTempGood: successful.length > 0 ? Math.round(successful.reduce((sum: number, c: any) => sum + (c.weather?.temp || 15), 0) / successful.length) : 15,
           avgPressureGood: successful.length > 0 ? Math.round(successful.reduce((sum: number, c: any) => sum + (c.weather?.pressure || 760), 0) / successful.length) : 760,
           topFish: Object.entries(successful.reduce((acc: any, c: any) => {
@@ -333,6 +332,7 @@ export default function AIPage() {
           total: collectiveWithWeather.length,
           uniqueFishers: uniqueFishers,
           successful: successful.length,
+          // 🔥 Давление в мм рт. ст.
           avgTempGood: successful.length > 0 ? Math.round(successful.reduce((sum: number, c: any) => sum + (c.weather?.temp || 15), 0) / successful.length) : 15,
           avgPressureGood: successful.length > 0 ? Math.round(successful.reduce((sum: number, c: any) => sum + (c.weather?.pressure || 760), 0) / successful.length) : 760,
           topFish: Object.entries(successful.reduce((acc: any, c: any) => {
@@ -417,7 +417,7 @@ ${stats.personal.notes.patterns.inactive ? `• Неактивный клёв: $
 📊 ТВОЯ СТАТИСТИКА:
 • Всего уловов: ${stats.personal?.total || 0}
 • Успешных (клёв 8-10): ${stats.personal?.successful || 0}
-• При хорошем клёве: ${stats.personal?.avgTempGood}°C, ${stats.personal?.avgPressureGood} гПа
+• При хорошем клёве: ${stats.personal?.avgTempGood}°C, ${stats.personal?.avgPressureGood} мм рт. ст.
 • Лучшая рыба: ${stats.personal?.topFish}
 • Лучшая приманка: ${stats.personal?.topLure}
 ${notesText}
@@ -466,7 +466,7 @@ ${stats.collective.notes.patterns.current ? `• Течение: ${stats.collect
 
 📊 КОЛЛЕКТИВНАЯ СТАТИСТИКА (${stats.collective?.total || 0} уловов от ${stats.collective?.uniqueFishers || 0} рыбаков):
 • Успешных (клёв 8-10): ${stats.collective?.successful || 0}
-• При хорошем клёве: ${stats.collective?.avgTempGood}°C, ${stats.collective?.avgPressureGood} гПа
+• При хорошем клёве: ${stats.collective?.avgTempGood}°C, ${stats.collective?.avgPressureGood} мм рт. ст.
 • Лучшая рыба: ${stats.collective?.topFish}
 • Лучшая приманка: ${stats.collective?.topLure}
 ${notesText}
@@ -488,10 +488,10 @@ ${forecastText}
 
 📅 ПРОГНОЗ ПО ДНЯМ:
 🗓️ [День 1]: 🎯 [X/10] 💡 [...]
-🗓️ [День 2]: 🎯 [X/10] 💡 [...]
-️ [День 3]: 🎯 [X/10] 💡 [...]
+️ [День 2]: 🎯 [X/10] 💡 [...]
+🗓️ [День 3]: 🎯 [X/10] 💡 [...]
 
-🏆 ЛУЧШИЙ ДЕНЬ: [...]
+ ЛУЧШИЙ ДЕНЬ: [...]
 
 🎣 РЕКОМЕНДАЦИИ:
 🐟 Рыба: [что ловят другие]
