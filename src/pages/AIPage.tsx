@@ -485,37 +485,41 @@ ${forecastText}
       }
 
       // ЗАПРОС К СЕРВЕРНОМУ API
-      console.log('📤 Sending request to /api/ai-predict')
-      console.log('Prompt length:', prompt.length)
-
       const response = await fetch('/api/ai-predict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
       })
 
-      console.log('📥 Response status:', response.status)
       const responseText = await response.text()
-      console.log('📥 Response text:', responseText.substring(0, 200))
-
-      let data
+      let data;
       try {
-        data = JSON.parse(responseText)
+        data = JSON.parse(responseText);
       } catch (e) {
-        console.error('❌ Failed to parse JSON:', e)
-        throw new Error(`Invalid JSON: ${responseText}`)
+        throw new Error(`Invalid JSON: ${responseText}`);
+      }
+
+      // 🔥 ПРОВЕРКА НА ЛИМИТ (Статус 429 или спец. сообщение)
+      if (response.status === 429 || data.error === 'LIMIT_REACHED') {
+        setPrediction(
+          `📊 **Лимит на сегодня исчерпан!**\n\n` +
+          `Нейросеть работает на максимальной мощности, и бесплатный тариф на сегодня закончился.\n\n` +
+          `🔄 **Приходи завтра** — лимиты обновятся, и я снова смогу анализировать погоду!`
+        );
+        setLoading(false);
+        return; // Прерываем выполнение, чтобы не показать ошибку
       }
 
       if (!response.ok) {
-        throw new Error(data.error || `API error: ${response.status}`)
+        throw new Error(data.error || `API error: ${response.status}`);
       }
 
-      setPrediction(data.prediction)
+      setPrediction(data.prediction);
     } catch (error: any) {
-      console.error('AI error:', error)
-      setPrediction(`❌ Ошибка: ${error.message}`)
+      console.error('AI error:', error);
+      setPrediction(`❌ Ошибка: ${error.message}`);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -674,8 +678,16 @@ ${forecastText}
 
       {/* Результат */}
       {prediction && (
-        <div className="bg-white p-5 rounded-xl shadow-lg border border-gray-200 animate-fade-in">
-          <div className="whitespace-pre-wrap font-sans text-gray-800 text-sm leading-relaxed">
+        <div className={`p-5 rounded-xl shadow-lg border animate-fade-in ${
+          prediction.includes('Лимит на сегодня исчерпан')
+            ? 'bg-yellow-50 border-yellow-200'
+            : 'bg-white border-gray-200'
+        }`}>
+          <div className={`whitespace-pre-wrap font-sans text-sm leading-relaxed ${
+             prediction.includes('Лимит на сегодня исчерпан')
+               ? 'text-yellow-900 text-center font-semibold'
+               : 'text-gray-800'
+          }`}>
             {prediction}
           </div>
         </div>
